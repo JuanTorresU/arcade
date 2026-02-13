@@ -22,7 +22,7 @@ struct StepResult {
 
 class SnakeEnv {
  public:
-  SnakeEnv(int board_size = 10, int max_steps = 1000, uint32_t seed = 42);
+  SnakeEnv(int board_size = 20, int max_steps = 4000, uint32_t seed = 42);
 
   void reset(uint32_t seed);
   void reset();
@@ -46,8 +46,8 @@ class SnakeEnv {
   [[nodiscard]] Point food() const { return food_; }
 
  private:
-  int board_size_ = 10;
-  int max_steps_ = 1000;
+  int board_size_ = 20;
+  int max_steps_ = 4000;
   int steps_ = 0;
   int steps_since_food_ = 0;  // pasos sin comer — mata juegos circulares
   int direction_ = 3;  // 0=UP 1=DOWN 2=LEFT 3=RIGHT

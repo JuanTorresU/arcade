@@ -34,8 +34,8 @@ cd /workspace/arcade/games/snake/ai/cpp
 
 ## Artefactos
 
-- Checkpoints: `/workspace/alphasnake_paper_10x10/`
-- ONNX: `/workspace/alphasnake_paper_10x10/alphasnake.onnx`
+- Checkpoints: `/workspace/alphasnake_paper_20x20/`
+- ONNX: `/workspace/alphasnake_paper_20x20/alphasnake.onnx`
 
 ## Integración local JS/HTML
 

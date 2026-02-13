@@ -34,7 +34,7 @@ struct AlphaSnakeNetImpl : torch::nn::Module {
 
   std::pair<torch::Tensor, torch::Tensor> forward(torch::Tensor x);
 
-  int board_size_ = 10;
+  int board_size_ = 20;
   int channels_ = 64;
 
   torch::nn::Conv2d stem_conv{nullptr};
@@ -86,10 +86,10 @@ class PolicyValueModel {
   bool load(const std::string& path, std::string& error);
 
  private:
-  int board_size_ = 10;
+  int board_size_ = 20;
   int channels_ = 64;
   int blocks_ = 6;
-  int input_dim_ = 400;
+  int input_dim_ = 1600;
 
   torch::Device device_ = torch::kCPU;
   mutable AlphaSnakeNet net_{nullptr};

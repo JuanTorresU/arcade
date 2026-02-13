@@ -29,7 +29,7 @@ int argmax4(const std::array<float, 4>& v) {
 int main(int argc, char** argv) {
   auto args = parse_cli(argc, argv);
 
-  const std::string config_path = cli_get(args, "--config", "config/config_paper_10x10.yaml");
+  const std::string config_path = cli_get(args, "--config", "config/config_paper_20x20.yaml");
   const std::string profile = cli_get(args, "--profile", "paper_strict");
 
   TrainConfig base_cfg;

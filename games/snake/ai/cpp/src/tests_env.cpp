@@ -7,7 +7,7 @@ using namespace alphasnake;
 
 int main() {
   {
-    SnakeEnv env(10, 1000, 123);
+    SnakeEnv env(20, 4000, 123);
     auto head0 = env.snake().front();
     StepResult st = env.step(2);  // LEFT es reversa directa si va RIGHT
     auto head1 = env.snake().front();
@@ -16,7 +16,7 @@ int main() {
   }
 
   {
-    SnakeEnv env(10, 1000, 123);
+    SnakeEnv env(20, 4000, 123);
     auto h = env.snake().front();
     env.set_food({h.x + 1, h.y});
     StepResult st = env.step(3);  // RIGHT
@@ -26,7 +26,7 @@ int main() {
   }
 
   {
-    SnakeEnv env(10, 1000, 123);
+    SnakeEnv env(20, 4000, 123);
     StepResult st{};
     for (int i = 0; i < 20; ++i) {
       st = env.step(3);  // RIGHT hasta chocar
@@ -38,9 +38,9 @@ int main() {
   }
 
   {
-    SnakeEnv env(10, 1000, 123);
+    SnakeEnv env(20, 4000, 123);
     auto st = env.get_state();
-    assert(st.size() == static_cast<std::size_t>(4 * 10 * 10));
+    assert(st.size() == static_cast<std::size_t>(4 * 20 * 20));
   }
 
   std::cout << "test_env: OK\n";

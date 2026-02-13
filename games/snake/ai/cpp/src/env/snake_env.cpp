@@ -158,7 +158,7 @@ StepResult SnakeEnv::step(int action) {
   ++steps_;
 
   // Inanición: si la serpiente no come en board_size² pasos, termina.
-  // En 10x10 = 100 pasos hay tiempo de sobra para alcanzar cualquier
+  // En 20x20 = 400 pasos hay tiempo de sobra para alcanzar cualquier
   // celda. Esto mata juegos donde la serpiente da vueltas en círculos
   // y desperdicia compute (~1000 movimientos MCTS inútiles).
   const int starvation_limit = board_size_ * board_size_;

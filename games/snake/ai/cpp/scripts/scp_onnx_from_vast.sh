@@ -9,7 +9,7 @@ fi
 
 HOST="$1"
 PORT="$2"
-REMOTE_PATH="${3:-/workspace/alphasnake_paper_10x10/alphasnake.onnx}"
+REMOTE_PATH="${3:-/workspace/alphasnake_paper_20x20/alphasnake.onnx}"
 LOCAL_PATH="${4:-/Users/JuanCamiloTorresUrrego/Documents/tiktok/arcade/games/snake/ai/alphasnake.onnx}"
 USER_NAME="${VAST_USER:-root}"
 

@@ -6,8 +6,8 @@
 namespace alphasnake {
 
 struct TrainConfig {
-  int board_size = 10;
-  int max_steps = 1000;
+  int board_size = 20;
+  int max_steps = 4000;
   int model_channels = 64;
   int model_blocks = 6;
   int num_simulations = 400;
@@ -33,7 +33,7 @@ struct TrainConfig {
   int iterations = 200;
 
   int seed = 42;
-  std::string save_dir = "/workspace/alphasnake_paper_10x10";
+  std::string save_dir = "/workspace/alphasnake_paper_20x20";
   std::string profile = "paper_strict";
 
   int warmup_iterations = 60;

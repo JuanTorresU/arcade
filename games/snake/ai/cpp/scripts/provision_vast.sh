@@ -41,6 +41,6 @@ if not torch.cuda.is_available():
     raise SystemExit("[ERROR] PyTorch no detecta CUDA. Revisa imagen/driver/template de Vast.")
 PY
 
-mkdir -p /workspace/alphasnake_paper_10x10
+mkdir -p /workspace/alphasnake_paper_20x20
 
 echo "[OK] Provisioning completado"

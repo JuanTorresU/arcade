@@ -12,7 +12,7 @@ namespace fs = std::filesystem;
 int main(int argc, char** argv) {
   auto args = parse_cli(argc, argv);
 
-  const std::string config_path = cli_get(args, "--config", "config/config_paper_10x10.yaml");
+  const std::string config_path = cli_get(args, "--config", "config/config_paper_20x20.yaml");
   TrainConfig cfg;
   std::string err;
   if (!load_config_file(config_path, cfg, err)) {

@@ -29,7 +29,7 @@ class ResidualBlock(nn.Module):
 
 
 class AlphaSnakeNet(nn.Module):
-    def __init__(self, board_size: int = 10, channels: int = 64, blocks: int = 6) -> None:
+    def __init__(self, board_size: int = 20, channels: int = 64, blocks: int = 6) -> None:
         super().__init__()
         self.board_size = board_size
 
@@ -129,7 +129,7 @@ def main() -> None:
     ap = argparse.ArgumentParser()
     ap.add_argument("--checkpoint", required=True)
     ap.add_argument("--out", required=True)
-    ap.add_argument("--board-size", type=int, default=10)
+    ap.add_argument("--board-size", type=int, default=20)
     ap.add_argument("--channels", type=int, default=64)
     ap.add_argument("--blocks", type=int, default=6)
     args = ap.parse_args()

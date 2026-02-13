@@ -113,6 +113,13 @@ void PolicyValueModel::init(int board_size,
       torch::optim::AdamWOptions(lr).weight_decay(weight_decay));
 }
 
+std::string PolicyValueModel::device_string() const {
+  if (device_.is_cuda()) {
+    return "cuda";
+  }
+  return "cpu";
+}
+
 Prediction PolicyValueModel::predict(const std::vector<float>& state) const {
   Prediction pred;
   if (static_cast<int>(state.size()) != input_dim_ || !net_) {
@@ -140,6 +147,47 @@ Prediction PolicyValueModel::predict(const std::vector<float>& state) const {
   }
   pred.value = v.data_ptr<float>()[0];
   return pred;
+}
+
+std::vector<Prediction> PolicyValueModel::predict_batch(
+    const std::vector<std::vector<float>>& states) const {
+  std::vector<Prediction> out;
+  if (states.empty() || !net_) {
+    return out;
+  }
+
+  const int64_t bs = static_cast<int64_t>(states.size());
+  std::vector<float> flat;
+  flat.reserve(static_cast<std::size_t>(bs * input_dim_));
+  for (const auto& s : states) {
+    if (static_cast<int>(s.size()) != input_dim_) {
+      return out;
+    }
+    flat.insert(flat.end(), s.begin(), s.end());
+  }
+
+  std::lock_guard<std::mutex> lock(infer_mu_);
+  torch::NoGradGuard no_grad;
+  net_->eval();
+
+  auto x = torch::from_blob(flat.data(), {bs, 4, board_size_, board_size_}, torch::kFloat32)
+               .clone()
+               .to(device_);
+  auto pred = net_->forward(x);
+  auto p = pred.first.to(torch::kCPU).contiguous();
+  auto v = pred.second.to(torch::kCPU).contiguous();
+
+  out.resize(static_cast<std::size_t>(bs));
+  const float* pptr = p.data_ptr<float>();
+  const float* vptr = v.data_ptr<float>();
+  for (int64_t i = 0; i < bs; ++i) {
+    for (int a = 0; a < 4; ++a) {
+      out[static_cast<std::size_t>(i)].policy[static_cast<std::size_t>(a)] =
+          pptr[i * 4 + a];
+    }
+    out[static_cast<std::size_t>(i)].value = vptr[i];
+  }
+  return out;
 }
 
 LossStats PolicyValueModel::train_batch(const std::vector<TrainingExample>& batch,

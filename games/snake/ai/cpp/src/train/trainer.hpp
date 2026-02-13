@@ -1,5 +1,6 @@
 #pragma once
 
+#include <functional>
 #include <string>
 #include <vector>
 
@@ -39,7 +40,8 @@ class AlphaSnakeTrainer {
   bool save_checkpoint(int iteration, std::string& error) const;
 
   std::vector<TrainingExample> run_self_play(int iteration);
-  std::vector<TrainingExample> play_single_game(const PolicyValueModel& model,
+  using PredictFn = std::function<Prediction(const std::vector<float>&)>;
+  std::vector<TrainingExample> play_single_game(PredictFn predict_fn,
                                                 uint32_t seed,
                                                 bool add_root_noise) const;
 

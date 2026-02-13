@@ -2,8 +2,10 @@
 
 #include <array>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <random>
+#include <vector>
 
 #include "common/config.hpp"
 #include "env/snake_env.hpp"
@@ -13,6 +15,9 @@ namespace alphasnake {
 
 class MCTS {
  public:
+  using PredictFn = std::function<Prediction(const std::vector<float>&)>;
+
+  MCTS(const TrainConfig& cfg, PredictFn predict_fn, uint32_t seed = 123);
   MCTS(const TrainConfig& cfg, const PolicyValueModel& model, uint32_t seed = 123);
 
   std::array<float, 4> search(const SnakeEnv& root_env,
@@ -44,7 +49,7 @@ class MCTS {
   };
 
   const TrainConfig cfg_;
-  const PolicyValueModel& model_;
+  PredictFn predict_fn_;
   std::mt19937 rng_;
 
   float expand(Node& node);

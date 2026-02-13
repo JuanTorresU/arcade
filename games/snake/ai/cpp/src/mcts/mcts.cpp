@@ -7,8 +7,11 @@
 
 namespace alphasnake {
 
+MCTS::MCTS(const TrainConfig& cfg, PredictFn predict_fn, uint32_t seed)
+    : cfg_(cfg), predict_fn_(std::move(predict_fn)), rng_(seed) {}
+
 MCTS::MCTS(const TrainConfig& cfg, const PolicyValueModel& model, uint32_t seed)
-    : cfg_(cfg), model_(model), rng_(seed) {}
+    : MCTS(cfg, [&model](const std::vector<float>& s) { return model.predict(s); }, seed) {}
 
 std::array<float, 4> MCTS::normalize_masked(const std::array<float, 4>& raw,
                                             const std::array<uint8_t, 4>& mask) {
@@ -46,7 +49,7 @@ std::array<float, 4> MCTS::normalize_masked(const std::array<float, 4>& raw,
 float MCTS::expand(Node& node) {
   node.valid_mask = node.env.valid_action_mask();
 
-  Prediction pred = model_.predict(node.env.get_state());
+  Prediction pred = predict_fn_(node.env.get_state());
   node.priors = normalize_masked(pred.policy, node.valid_mask);
   node.expanded = true;
 
@@ -61,7 +64,7 @@ float MCTS::expand(Node& node) {
       for (int i = 0; i < k; ++i) {
         SnakeEnv alt = node.env;
         alt.set_food(free[static_cast<std::size_t>(i)]);
-        Prediction p2 = model_.predict(alt.get_state());
+        Prediction p2 = predict_fn_(alt.get_state());
         sum += p2.value;
         ++used;
       }

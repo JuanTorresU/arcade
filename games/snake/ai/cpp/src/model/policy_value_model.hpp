@@ -71,8 +71,11 @@ class PolicyValueModel {
 
   [[nodiscard]] int board_size() const { return board_size_; }
   [[nodiscard]] int input_dim() const { return input_dim_; }
+  [[nodiscard]] bool uses_cuda() const { return device_.is_cuda(); }
+  [[nodiscard]] std::string device_string() const;
 
   [[nodiscard]] Prediction predict(const std::vector<float>& state) const;
+  [[nodiscard]] std::vector<Prediction> predict_batch(const std::vector<std::vector<float>>& states) const;
 
   LossStats train_batch(const std::vector<TrainingExample>& batch, float lr, float weight_decay);
 

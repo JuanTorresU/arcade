@@ -3,8 +3,11 @@
 #include <algorithm>
 #include <atomic>
 #include <chrono>
+#include <condition_variable>
+#include <deque>
 #include <filesystem>
 #include <fstream>
+#include <future>
 #include <iomanip>
 #include <iostream>
 #include <mutex>
@@ -59,6 +62,135 @@ std::string now_clock() {
   oss << std::put_time(&tm, "%Y-%m-%d %H:%M:%S");
   return oss.str();
 }
+
+class InferenceBatcher {
+ public:
+  struct Stats {
+    long long requests = 0;
+    long long states = 0;
+    long long batches = 0;
+  };
+
+  InferenceBatcher(const PolicyValueModel& model, int max_batch, int wait_us)
+      : model_(model),
+        max_batch_(std::max(1, max_batch)),
+        wait_us_(std::max(1, wait_us)) {}
+
+  ~InferenceBatcher() { stop(); }
+
+  void start() {
+    bool expected = false;
+    if (!running_.compare_exchange_strong(expected, true)) {
+      return;
+    }
+    worker_ = std::thread(&InferenceBatcher::run_loop, this);
+  }
+
+  void stop() {
+    bool expected = true;
+    if (!running_.compare_exchange_strong(expected, false)) {
+      return;
+    }
+    cv_.notify_all();
+    if (worker_.joinable()) {
+      worker_.join();
+    }
+  }
+
+  Prediction predict(const std::vector<float>& state) {
+    Request req;
+    req.state = state;
+    auto fut = req.promise.get_future();
+
+    {
+      std::lock_guard<std::mutex> lock(mu_);
+      queue_.push_back(std::move(req));
+      stats_requests_.fetch_add(1);
+      stats_states_.fetch_add(1);
+    }
+    cv_.notify_one();
+    return fut.get();
+  }
+
+  [[nodiscard]] Stats stats() const {
+    Stats s;
+    s.requests = stats_requests_.load();
+    s.states = stats_states_.load();
+    s.batches = stats_batches_.load();
+    return s;
+  }
+
+ private:
+  struct Request {
+    std::vector<float> state;
+    std::promise<Prediction> promise;
+  };
+
+  void run_loop() {
+    while (true) {
+      std::vector<Request> batch;
+      {
+        std::unique_lock<std::mutex> lock(mu_);
+        cv_.wait(lock, [&]() { return !queue_.empty() || !running_.load(); });
+
+        if (queue_.empty() && !running_.load()) {
+          break;
+        }
+
+        const auto deadline =
+            std::chrono::steady_clock::now() + std::chrono::microseconds(wait_us_);
+        while (queue_.size() < static_cast<std::size_t>(max_batch_) && running_.load()) {
+          if (cv_.wait_until(lock, deadline) == std::cv_status::timeout) {
+            break;
+          }
+        }
+
+        const std::size_t take =
+            std::min<std::size_t>(queue_.size(), static_cast<std::size_t>(max_batch_));
+        batch.reserve(take);
+        for (std::size_t i = 0; i < take; ++i) {
+          batch.emplace_back(std::move(queue_.front()));
+          queue_.pop_front();
+        }
+      }
+
+      if (batch.empty()) {
+        continue;
+      }
+
+      std::vector<std::vector<float>> states;
+      states.reserve(batch.size());
+      for (const auto& req : batch) {
+        states.push_back(req.state);
+      }
+
+      std::vector<Prediction> preds = model_.predict_batch(states);
+      if (preds.size() != batch.size()) {
+        preds.assign(batch.size(), Prediction{});
+      }
+
+      for (std::size_t i = 0; i < batch.size(); ++i) {
+        batch[i].promise.set_value(preds[i]);
+      }
+      stats_batches_.fetch_add(1);
+    }
+  }
+
+  const PolicyValueModel& model_;
+  int max_batch_ = 256;
+  int wait_us_ = 1000;
+
+  mutable std::mutex mu_;
+  std::condition_variable cv_;
+  std::deque<Request> queue_;
+
+  std::atomic<bool> running_{false};
+  std::thread worker_;
+
+  std::atomic<long long> stats_requests_{0};
+  std::atomic<long long> stats_states_{0};
+  std::atomic<long long> stats_batches_{0};
+};
 
 }  // namespace
 
@@ -152,7 +284,7 @@ bool AlphaSnakeTrainer::load_checkpoint(std::string& error) {
   return true;
 }
 
-std::vector<TrainingExample> AlphaSnakeTrainer::play_single_game(const PolicyValueModel& model,
+std::vector<TrainingExample> AlphaSnakeTrainer::play_single_game(PredictFn predict_fn,
                                                                   uint32_t seed,
                                                                   bool add_root_noise) const {
   SnakeEnv env(cfg_.board_size, cfg_.max_steps, seed);
@@ -164,7 +296,7 @@ std::vector<TrainingExample> AlphaSnakeTrainer::play_single_game(const PolicyVal
   int move = 0;
   while (!env.is_done()) {
     const float temp = (move < cfg_.temp_decay_move) ? 1.0f : 0.0f;
-    MCTS mcts(cfg_, model, seed + static_cast<uint32_t>(move * 31 + 7));
+    MCTS mcts(cfg_, predict_fn, seed + static_cast<uint32_t>(move * 31 + 7));
     std::array<float, 4> pi = mcts.search(env, add_root_noise, temp);
 
     states.push_back(env.get_state());
@@ -206,19 +338,17 @@ std::vector<TrainingExample> AlphaSnakeTrainer::run_self_play(int iteration) {
   std::atomic<int> next_game{0};
   std::atomic<int> completed{0};
   std::atomic<long long> total_positions{0};
+  InferenceBatcher infer_server(best_model_, cfg_.inference_batch_size, cfg_.inference_wait_us);
+  infer_server.start();
 
   std::vector<std::thread> pool;
   pool.reserve(static_cast<std::size_t>(workers));
 
   for (int w = 0; w < workers; ++w) {
     pool.emplace_back([&, w]() {
-      PolicyValueModel local_model(cfg_.board_size,
-                                   cfg_.model_channels,
-                                   cfg_.model_blocks,
-                                   static_cast<uint32_t>(cfg_.seed + 100 + w),
-                                   cfg_.lr,
-                                   cfg_.weight_decay);
-      local_model.copy_from(best_model_);
+      auto predict_fn = [&infer_server](const std::vector<float>& state) {
+        return infer_server.predict(state);
+      };
       while (true) {
         const int g = next_game.fetch_add(1);
         if (g >= cfg_.games_per_iter) {
@@ -226,7 +356,7 @@ std::vector<TrainingExample> AlphaSnakeTrainer::run_self_play(int iteration) {
         }
         const uint32_t seed = static_cast<uint32_t>(
             cfg_.seed + iteration * 100000 + w * 1000 + g);
-        auto ex = play_single_game(local_model, seed, true);
+        auto ex = play_single_game(predict_fn, seed, true);
 
         total_positions.fetch_add(static_cast<long long>(ex.size()));
         {
@@ -242,13 +372,21 @@ std::vector<TrainingExample> AlphaSnakeTrainer::run_self_play(int iteration) {
 
   while (completed.load() < cfg_.games_per_iter) {
     std::this_thread::sleep_for(std::chrono::seconds(2));
+    const auto st = infer_server.stats();
+    const double avg_states = st.batches > 0 ? static_cast<double>(st.states) / st.batches : 0.0;
     std::cout << "      [Heartbeat] games=" << completed.load() << "/" << cfg_.games_per_iter
-              << " | positions=" << total_positions.load() << "\n";
+              << " | positions=" << total_positions.load()
+              << " | infer_reqs=" << st.requests
+              << " | infer_states=" << st.states
+              << " | infer_batches=" << st.batches
+              << " | avg_states_batch=" << std::fixed << std::setprecision(1) << avg_states
+              << std::defaultfloat << "\n";
   }
 
   for (auto& th : pool) {
     th.join();
   }
+  infer_server.stop();
 
   std::cout << "  [Self-play] completado | posiciones=" << all_examples.size() << "\n";
   return all_examples;
@@ -342,6 +480,7 @@ bool AlphaSnakeTrainer::run(bool resume, std::string& error) {
   std::cout << " Board: " << cfg_.board_size << "x" << cfg_.board_size << "\n";
   std::cout << " Simulations: " << cfg_.num_simulations << "\n";
   std::cout << " Games/iter: " << cfg_.games_per_iter << "\n";
+  std::cout << " Model device: " << best_model_.device_string() << "\n";
   std::cout << " Save dir: " << cfg_.save_dir << "\n";
   std::cout << "============================================================\n\n";
 

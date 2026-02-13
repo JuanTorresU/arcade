@@ -143,6 +143,10 @@ bool load_config_file(const std::string& path, TrainConfig& cfg, std::string& er
       if (!set_float(cfg.accept_threshold)) return false;
     } else if (full == "selfplay.workers" || full == "selfplay_workers") {
       if (!set_int(cfg.selfplay_workers)) return false;
+    } else if (full == "selfplay.inference_batch_size" || full == "inference_batch_size") {
+      if (!set_int(cfg.inference_batch_size)) return false;
+    } else if (full == "selfplay.inference_wait_us" || full == "inference_wait_us") {
+      if (!set_int(cfg.inference_wait_us)) return false;
     } else if (full == "train.iterations" || full == "iterations") {
       if (!set_int(cfg.iterations)) return false;
     } else if (full == "seed") {
@@ -171,6 +175,8 @@ TrainConfig with_profile(const TrainConfig& base, const std::string& profile) {
     cfg.games_per_iter = 256;
     cfg.eval_games = 80;
     cfg.selfplay_workers = std::min(8, std::max(2, cfg.selfplay_workers));
+    cfg.inference_batch_size = std::max(64, cfg.inference_batch_size);
+    cfg.inference_wait_us = std::max(500, cfg.inference_wait_us);
     cfg.iterations = cfg.warmup_iterations;
     cfg.temp_decay_move = 20;
     return cfg;
@@ -184,6 +190,8 @@ TrainConfig with_profile(const TrainConfig& base, const std::string& profile) {
     cfg.epochs_per_iter = 2;
     cfg.batch_size = 32;
     cfg.selfplay_workers = std::min(4, std::max(1, cfg.selfplay_workers));
+    cfg.inference_batch_size = std::min(64, std::max(16, cfg.inference_batch_size));
+    cfg.inference_wait_us = std::max(250, cfg.inference_wait_us);
     cfg.iterations = 1;
     cfg.temp_decay_move = 8;
     return cfg;
@@ -194,6 +202,8 @@ TrainConfig with_profile(const TrainConfig& base, const std::string& profile) {
     cfg.food_samples = 8;
     cfg.games_per_iter = 1000;
     cfg.eval_games = 200;
+    cfg.inference_batch_size = std::max(128, cfg.inference_batch_size);
+    cfg.inference_wait_us = std::max(500, cfg.inference_wait_us);
     cfg.iterations = cfg.strict_iterations > 0 ? cfg.strict_iterations : cfg.iterations;
     cfg.temp_decay_move = 30;
   }

@@ -6,7 +6,11 @@ ROOT_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
 BUILD_DIR="${1:-$ROOT_DIR/build}"
 
 # LibTorch CMake path from Python torch (pytorch image in Vast.ai)
-TORCH_CMAKE_PREFIX="$(python3 - <<'PY'\nimport torch\nprint(torch.utils.cmake_prefix_path)\nPY\n)"
+TORCH_CMAKE_PREFIX="$(python3 - <<'PY'
+import torch
+print(torch.utils.cmake_prefix_path)
+PY
+)"
 
 cmake -S "$ROOT_DIR" -B "$BUILD_DIR" \
   -DCMAKE_BUILD_TYPE=Release \

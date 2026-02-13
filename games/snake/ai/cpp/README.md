@@ -100,3 +100,11 @@ Este trainer C++ ahora implementa:
   - policy head y value head separados.
 
 Requisito: compilar en entorno con PyTorch/libtorch disponible (ej. `vastai/pytorch_*`).
+
+Si ves uso GPU bajo:
+
+- Verifica que el trainer imprima `Model device: cuda`.
+- `self-play` con MCTS sigue siendo mayormente CPU-bound; la GPU no estará al 100% todo el tiempo.
+- Ajusta batching de inferencia en `config/config_paper_10x10.yaml`:
+  - `selfplay.inference_batch_size` (ej. `256-1024`)
+  - `selfplay.inference_wait_us` (ej. `500-2000`)

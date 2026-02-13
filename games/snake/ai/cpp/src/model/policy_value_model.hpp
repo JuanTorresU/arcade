@@ -92,7 +92,7 @@ class PolicyValueModel {
   int input_dim_ = 400;
 
   torch::Device device_ = torch::kCPU;
-  AlphaSnakeNet net_{nullptr};
+  mutable AlphaSnakeNet net_{nullptr};
   std::unique_ptr<torch::optim::AdamW> optimizer_;
 
   mutable std::mutex train_mu_;

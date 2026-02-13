@@ -116,7 +116,7 @@ void PolicyValueModel::init(int board_size,
     // (mantissa 10-bit vs 23-bit). Pérdida despreciable para RL/NN,
     // ~2x throughput en RTX 40xx (Ada Lovelace).
     at::globalContext().setAllowTF32CuDNN(true);
-    at::globalContext().setAllowTF32Cublas(true);
+    at::globalContext().setAllowTF32CuBLAS(true);
   }
 
   net_ = AlphaSnakeNet(board_size_, channels_, blocks_);

@@ -57,13 +57,15 @@ class SnakeEnv {
 
   std::deque<Point> snake_;
   Point food_{};
+  std::vector<uint8_t> grid_;  // bitboard: 1 = celda ocupada por serpiente
 
   std::mt19937 rng_;
 
   [[nodiscard]] bool is_reverse(int action) const;
   [[nodiscard]] bool in_bounds(const Point& p) const;
-  [[nodiscard]] bool hits_body(const Point& p) const;
+  [[nodiscard]] bool grid_occupied(const Point& p) const;
   [[nodiscard]] Point next_head(int action) const;
+  void grid_set(const Point& p, uint8_t v);
   void spawn_food();
 };
 

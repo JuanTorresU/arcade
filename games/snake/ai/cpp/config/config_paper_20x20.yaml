@@ -13,18 +13,18 @@ model:
   blocks: 6
 
 mcts:
-  simulations: 800
+  simulations: 200
   cpuct: 1.0
   dir_alpha: 0.03
   dir_eps: 0.25
-  food_samples: 8
+  food_samples: 4
 
 selfplay:
-  games: 1000
+  games: 500
   workers: 64
   temp_decay: 60
-  inference_batch_size: 96
-  inference_wait_us: 400
+  inference_batch_size: 256
+  inference_wait_us: 800
 
 train:
   iterations: 200
@@ -36,7 +36,7 @@ train:
   gamma: 0.99
 
 eval:
-  games: 200
+  games: 100
   accept_threshold: 0.55
 
 schedule:

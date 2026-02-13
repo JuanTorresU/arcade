@@ -112,6 +112,41 @@ class InferenceBatcher {
     return fut.get();
   }
 
+  // Enviar múltiples estados de golpe al batcher.
+  // Todos se encolan juntos y pueden caer en el mismo batch GPU,
+  // eliminando k round-trips secuenciales (usado por food stochasticity).
+  std::vector<Prediction> predict_many(const std::vector<std::vector<float>>& states) {
+    if (states.empty()) {
+      return {};
+    }
+    if (states.size() == 1) {
+      return {predict(states[0])};
+    }
+
+    std::vector<std::future<Prediction>> futures;
+    futures.reserve(states.size());
+
+    {
+      std::lock_guard<std::mutex> lock(mu_);
+      for (const auto& state : states) {
+        Request req;
+        req.state = state;
+        futures.push_back(req.promise.get_future());
+        queue_.push_back(std::move(req));
+      }
+      stats_requests_.fetch_add(static_cast<long long>(states.size()));
+      stats_states_.fetch_add(static_cast<long long>(states.size()));
+    }
+    cv_.notify_one();
+
+    std::vector<Prediction> results;
+    results.reserve(futures.size());
+    for (auto& f : futures) {
+      results.push_back(f.get());
+    }
+    return results;
+  }
+
   [[nodiscard]] Stats stats() const {
     Stats s;
     s.requests = stats_requests_.load();
@@ -285,6 +320,7 @@ bool AlphaSnakeTrainer::load_checkpoint(std::string& error) {
 }
 
 std::vector<TrainingExample> AlphaSnakeTrainer::play_single_game(PredictFn predict_fn,
+                                                                  BatchPredictFn batch_predict_fn,
                                                                   uint32_t seed,
                                                                   bool add_root_noise) const {
   SnakeEnv env(cfg_.board_size, cfg_.max_steps, seed);
@@ -297,7 +333,7 @@ std::vector<TrainingExample> AlphaSnakeTrainer::play_single_game(PredictFn predi
   int move = 0;
   while (!env.is_done()) {
     const float temp = (move < cfg_.temp_decay_move) ? 1.0f : 0.0f;
-    MCTS mcts(cfg_, predict_fn, seed + static_cast<uint32_t>(move * 31 + 7));
+    MCTS mcts(cfg_, predict_fn, batch_predict_fn, seed + static_cast<uint32_t>(move * 31 + 7));
     std::array<float, 4> pi = mcts.search(env, add_root_noise, temp);
 
     states.push_back(env.get_state());
@@ -337,14 +373,11 @@ std::vector<TrainingExample> AlphaSnakeTrainer::play_single_game(PredictFn predi
 }
 
 std::vector<TrainingExample> AlphaSnakeTrainer::run_self_play(int iteration) {
-  // Auto-detect: workers son IO-bound (esperan GPU inference), así que
-  // podemos usar ~3x los cores sin saturar CPU.
-  int configured = cfg_.selfplay_workers;
+  // GPU es el cuello de botella principal: usar el número de workers
+  // configurado sin inflar artificialmente. Más workers solo agregan
+  // overhead de hilos cuando la GPU ya está saturada.
   const int hw = static_cast<int>(std::thread::hardware_concurrency());
-  if (hw > 0 && configured < hw) {
-    configured = std::max(configured, hw * 3);
-  }
-  const int workers = std::max(1, std::min(configured, cfg_.games_per_iter));
+  const int workers = std::max(1, std::min(cfg_.selfplay_workers, cfg_.games_per_iter));
 
   std::cout << "  [Self-play] workers=" << workers << " games=" << cfg_.games_per_iter
             << " sims=" << cfg_.num_simulations
@@ -368,6 +401,9 @@ std::vector<TrainingExample> AlphaSnakeTrainer::run_self_play(int iteration) {
       auto predict_fn = [&infer_server](const std::vector<float>& state) {
         return infer_server.predict(state);
       };
+      auto batch_predict_fn = [&infer_server](const std::vector<std::vector<float>>& states) {
+        return infer_server.predict_many(states);
+      };
       while (true) {
         const int g = next_game.fetch_add(1);
         if (g >= cfg_.games_per_iter) {
@@ -375,7 +411,7 @@ std::vector<TrainingExample> AlphaSnakeTrainer::run_self_play(int iteration) {
         }
         const uint32_t seed = static_cast<uint32_t>(
             cfg_.seed + iteration * 100000 + w * 1000 + g);
-        auto ex = play_single_game(predict_fn, seed, true);
+        auto ex = play_single_game(predict_fn, batch_predict_fn, seed, true);
 
         total_positions.fetch_add(static_cast<long long>(ex.size()));
         {
@@ -475,6 +511,9 @@ EvalMetrics AlphaSnakeTrainer::evaluate_model(const PolicyValueModel& model,
       auto predict_fn = [&infer_server](const std::vector<float>& state) {
         return infer_server.predict(state);
       };
+      auto batch_predict_fn = [&infer_server](const std::vector<std::vector<float>>& states) {
+        return infer_server.predict_many(states);
+      };
       while (true) {
         const int g = next_game.fetch_add(1);
         if (g >= games) {
@@ -486,7 +525,7 @@ EvalMetrics AlphaSnakeTrainer::evaluate_model(const PolicyValueModel& model,
 
         int move = 0;
         while (!env.is_done()) {
-          MCTS mcts(cfg_, predict_fn, seed + static_cast<uint32_t>(move * 17 + 3));
+          MCTS mcts(cfg_, predict_fn, batch_predict_fn, seed + static_cast<uint32_t>(move * 17 + 3));
           std::array<float, 4> pi = mcts.search(env, false, 0.0f);
           const int action = argmax4(pi);
           env.step(action);

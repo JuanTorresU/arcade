@@ -10,6 +10,12 @@ namespace alphasnake {
 MCTS::MCTS(const TrainConfig& cfg, PredictFn predict_fn, uint32_t seed)
     : cfg_(cfg), predict_fn_(std::move(predict_fn)), rng_(seed) {}
 
+MCTS::MCTS(const TrainConfig& cfg, PredictFn predict_fn, BatchPredictFn batch_fn, uint32_t seed)
+    : cfg_(cfg),
+      predict_fn_(std::move(predict_fn)),
+      batch_predict_fn_(std::move(batch_fn)),
+      rng_(seed) {}
+
 MCTS::MCTS(const TrainConfig& cfg, const PolicyValueModel& model, uint32_t seed)
     : MCTS(cfg, [&model](const std::vector<float>& s) { return model.predict(s); }, seed) {}
 
@@ -49,6 +55,39 @@ std::array<float, 4> MCTS::normalize_masked(const std::array<float, 4>& raw,
 float MCTS::expand(Node& node) {
   node.valid_mask = node.env.valid_action_mask();
 
+  // Si hay food stochasticity Y tenemos batch predict, enviamos todo junto
+  // (estado original + k alternativas de comida) en una sola llamada batch.
+  // Esto elimina k round-trips secuenciales al servidor de inferencia.
+  if (node.food_eaten && cfg_.food_samples > 1 && batch_predict_fn_) {
+    std::vector<Point> free = node.env.free_cells();
+    const int k = free.empty() ? 0 : std::min(cfg_.food_samples - 1, static_cast<int>(free.size()));
+
+    // Construir batch: [estado_original, alt_1, alt_2, ..., alt_k]
+    std::vector<std::vector<float>> batch_states;
+    batch_states.reserve(static_cast<std::size_t>(1 + k));
+    batch_states.push_back(node.env.get_state());
+
+    if (k > 0) {
+      std::shuffle(free.begin(), free.end(), rng_);
+      for (int i = 0; i < k; ++i) {
+        SnakeEnv alt = node.env;
+        alt.set_food(free[static_cast<std::size_t>(i)]);
+        batch_states.push_back(alt.get_state());
+      }
+    }
+
+    auto preds = batch_predict_fn_(batch_states);
+    node.priors = normalize_masked(preds[0].policy, node.valid_mask);
+    node.expanded = true;
+
+    float sum = 0.0f;
+    for (std::size_t i = 0; i < preds.size(); ++i) {
+      sum += preds[i].value;
+    }
+    return sum / static_cast<float>(preds.size());
+  }
+
+  // Path normal (sin food stochasticity o sin batch predict).
   Prediction pred = predict_fn_(node.env.get_state());
   node.priors = normalize_masked(pred.policy, node.valid_mask);
   node.expanded = true;

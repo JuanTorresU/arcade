@@ -172,16 +172,19 @@ TrainConfig with_profile(const TrainConfig& base, const std::string& profile) {
   cfg.profile = profile;
 
   if (profile == "warmup_fast") {
-    cfg.num_simulations = 96;
-    cfg.food_samples = 4;
-    cfg.games_per_iter = 256;
-    cfg.eval_games = 80;
-    // No capear workers bajo: son IO-bound (esperan GPU), no CPU-bound.
+    // Escalado para 20x20: juegos duran ~4x más que en 10x10,
+    // así que reducimos sims y juegos para mantener tiempo razonable.
+    cfg.num_simulations = 48;
+    cfg.food_samples = 2;
+    cfg.games_per_iter = 128;
+    cfg.eval_games = 40;
+    // GPU es el cuello de botella: no necesitamos muchos workers,
+    // solo suficientes para llenar los batches de inferencia.
     cfg.selfplay_workers = std::max(32, cfg.selfplay_workers);
-    cfg.inference_batch_size = std::max(64, cfg.inference_batch_size);
-    cfg.inference_wait_us = std::max(300, cfg.inference_wait_us);
+    cfg.inference_batch_size = std::max(128, cfg.inference_batch_size);
+    cfg.inference_wait_us = std::max(600, cfg.inference_wait_us);
     cfg.iterations = cfg.warmup_iterations;
-    cfg.temp_decay_move = 20;
+    cfg.temp_decay_move = 40;
     return cfg;
   }
 
@@ -201,14 +204,16 @@ TrainConfig with_profile(const TrainConfig& base, const std::string& profile) {
   }
 
   if (profile == "paper_strict") {
-    cfg.num_simulations = 400;
-    cfg.food_samples = 8;
-    cfg.games_per_iter = 1000;
-    cfg.eval_games = 200;
-    cfg.inference_batch_size = std::max(128, cfg.inference_batch_size);
-    cfg.inference_wait_us = std::max(500, cfg.inference_wait_us);
+    // Escalado para 20x20: tablero 4x más grande requiere menos sims
+    // por movimiento para mantener throughput de entrenamiento viable.
+    cfg.num_simulations = 200;
+    cfg.food_samples = 4;
+    cfg.games_per_iter = 500;
+    cfg.eval_games = 100;
+    cfg.inference_batch_size = std::max(256, cfg.inference_batch_size);
+    cfg.inference_wait_us = std::max(800, cfg.inference_wait_us);
     cfg.iterations = cfg.strict_iterations > 0 ? cfg.strict_iterations : cfg.iterations;
-    cfg.temp_decay_move = 30;
+    cfg.temp_decay_move = 60;
   }
 
   return cfg;

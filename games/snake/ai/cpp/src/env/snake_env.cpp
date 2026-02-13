@@ -36,7 +36,10 @@ float direction_value(int action) {
 }  // namespace
 
 SnakeEnv::SnakeEnv(int board_size, int max_steps, uint32_t seed)
-    : board_size_(board_size), max_steps_(max_steps), rng_(seed) {
+    : board_size_(board_size),
+      max_steps_(max_steps),
+      grid_(static_cast<std::size_t>(board_size * board_size), 0),
+      rng_(seed) {
   reset(seed);
 }
 
@@ -53,11 +56,17 @@ void SnakeEnv::reset() {
   direction_ = 3;
 
   snake_.clear();
+  std::fill(grid_.begin(), grid_.end(), static_cast<uint8_t>(0));
+
   const int cx = board_size_ / 2;
   const int cy = board_size_ / 2;
   snake_.push_back({cx, cy});
   snake_.push_back({cx - 1, cy});
   snake_.push_back({cx - 2, cy});
+
+  grid_set({cx, cy}, 1);
+  grid_set({cx - 1, cy}, 1);
+  grid_set({cx - 2, cy}, 1);
 
   spawn_food();
 }
@@ -74,13 +83,12 @@ bool SnakeEnv::in_bounds(const Point& p) const {
   return p.x >= 0 && p.y >= 0 && p.x < board_size_ && p.y < board_size_;
 }
 
-bool SnakeEnv::hits_body(const Point& p) const {
-  for (const auto& s : snake_) {
-    if (s.x == p.x && s.y == p.y) {
-      return true;
-    }
-  }
-  return false;
+bool SnakeEnv::grid_occupied(const Point& p) const {
+  return grid_[static_cast<std::size_t>(p.y * board_size_ + p.x)] != 0;
+}
+
+void SnakeEnv::grid_set(const Point& p, uint8_t v) {
+  grid_[static_cast<std::size_t>(p.y * board_size_ + p.x)] = v;
 }
 
 Point SnakeEnv::next_head(int action) const {
@@ -114,19 +122,20 @@ StepResult SnakeEnv::step(int action) {
     return out;
   }
 
-  // Si no crece, la cola se mueve y no cuenta como colision.
+  // Si no crece, la cola se va a mover, así que la celda de la cola
+  // no cuenta como colisión. Limpiamos temporalmente para el check.
   Point tail = snake_.back();
-  bool body_hit = false;
-  for (std::size_t i = 0; i < snake_.size(); ++i) {
-    const auto& s = snake_[i];
-    if (!grow && i == snake_.size() - 1 && s.x == tail.x && s.y == tail.y) {
-      continue;
-    }
-    if (s.x == h2.x && s.y == h2.y) {
-      body_hit = true;
-      break;
-    }
+  if (!grow) {
+    grid_set(tail, 0);
   }
+
+  bool body_hit = grid_occupied(h2);
+
+  if (!grow) {
+    // Restaurar grid de cola (se quitará definitivamente abajo si no hay hit).
+    grid_set(tail, 1);
+  }
+
   if (body_hit) {
     done_ = true;
     won_ = false;
@@ -136,7 +145,10 @@ StepResult SnakeEnv::step(int action) {
     return out;
   }
 
+  // Mover serpiente: agregar cabeza al grid.
+  grid_set(h2, 1);
   snake_.push_front(h2);
+
   if (grow) {
     out.reward = 1.0f;
     out.food_eaten = true;
@@ -150,6 +162,8 @@ StepResult SnakeEnv::step(int action) {
     }
     spawn_food();
   } else {
+    // Quitar cola del grid.
+    grid_set(tail, 0);
     snake_.pop_back();
     out.reward = 0.0f;
     ++steps_since_food_;
@@ -188,17 +202,21 @@ std::vector<float> SnakeEnv::get_state() const {
   const int size = board_size_ * board_size_;
   std::vector<float> st(static_cast<std::size_t>(4 * size), 0.0f);
 
-  for (const auto& s : snake_) {
-    st[static_cast<std::size_t>(s.y * board_size_ + s.x)] = 1.0f;
+  // Canal 0: cuerpo de la serpiente (usar grid directamente).
+  for (int i = 0; i < size; ++i) {
+    st[static_cast<std::size_t>(i)] = static_cast<float>(grid_[static_cast<std::size_t>(i)]);
   }
 
+  // Canal 1: cabeza.
   if (!snake_.empty()) {
     const auto& h = snake_.front();
     st[static_cast<std::size_t>(size + h.y * board_size_ + h.x)] = 1.0f;
   }
 
+  // Canal 2: comida.
   st[static_cast<std::size_t>(2 * size + food_.y * board_size_ + food_.x)] = 1.0f;
 
+  // Canal 3: dirección (constante en todo el tablero).
   const float dir_val = direction_value(direction_);
   for (int i = 0; i < size; ++i) {
     st[static_cast<std::size_t>(3 * size + i)] = dir_val;
@@ -221,9 +239,8 @@ std::vector<Point> SnakeEnv::free_cells() const {
   out.reserve(static_cast<std::size_t>(board_size_ * board_size_));
   for (int y = 0; y < board_size_; ++y) {
     for (int x = 0; x < board_size_; ++x) {
-      Point p{x, y};
-      if (!hits_body(p)) {
-        out.push_back(p);
+      if (grid_[static_cast<std::size_t>(y * board_size_ + x)] == 0) {
+        out.push_back({x, y});
       }
     }
   }
@@ -231,7 +248,7 @@ std::vector<Point> SnakeEnv::free_cells() const {
 }
 
 void SnakeEnv::set_food(const Point& p) {
-  if (in_bounds(p) && !hits_body(p)) {
+  if (in_bounds(p) && !grid_occupied(p)) {
     food_ = p;
   }
 }

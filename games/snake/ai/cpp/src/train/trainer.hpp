@@ -41,7 +41,9 @@ class AlphaSnakeTrainer {
 
   std::vector<TrainingExample> run_self_play(int iteration);
   using PredictFn = std::function<Prediction(const std::vector<float>&)>;
+  using BatchPredictFn = std::function<std::vector<Prediction>(const std::vector<std::vector<float>>&)>;
   std::vector<TrainingExample> play_single_game(PredictFn predict_fn,
+                                                BatchPredictFn batch_predict_fn,
                                                 uint32_t seed,
                                                 bool add_root_noise) const;
 

@@ -26,9 +26,9 @@ struct TrainConfig {
   int games_per_iter = 1000;
   int eval_games = 200;
   float accept_threshold = 0.55f;
-  int selfplay_workers = 8;
-  int inference_batch_size = 256;
-  int inference_wait_us = 1000;
+  int selfplay_workers = 64;
+  int inference_batch_size = 96;
+  int inference_wait_us = 400;
   int iterations = 200;
 
   int seed = 42;

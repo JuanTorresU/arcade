@@ -174,9 +174,10 @@ TrainConfig with_profile(const TrainConfig& base, const std::string& profile) {
     cfg.food_samples = 4;
     cfg.games_per_iter = 256;
     cfg.eval_games = 80;
-    cfg.selfplay_workers = std::min(8, std::max(2, cfg.selfplay_workers));
+    // No capear workers bajo: son IO-bound (esperan GPU), no CPU-bound.
+    cfg.selfplay_workers = std::max(32, cfg.selfplay_workers);
     cfg.inference_batch_size = std::max(64, cfg.inference_batch_size);
-    cfg.inference_wait_us = std::max(500, cfg.inference_wait_us);
+    cfg.inference_wait_us = std::max(300, cfg.inference_wait_us);
     cfg.iterations = cfg.warmup_iterations;
     cfg.temp_decay_move = 20;
     return cfg;
@@ -189,7 +190,7 @@ TrainConfig with_profile(const TrainConfig& base, const std::string& profile) {
     cfg.eval_games = 16;
     cfg.epochs_per_iter = 2;
     cfg.batch_size = 32;
-    cfg.selfplay_workers = std::min(4, std::max(1, cfg.selfplay_workers));
+    cfg.selfplay_workers = std::max(4, std::min(16, cfg.selfplay_workers));
     cfg.inference_batch_size = std::min(64, std::max(16, cfg.inference_batch_size));
     cfg.inference_wait_us = std::max(250, cfg.inference_wait_us);
     cfg.iterations = 1;

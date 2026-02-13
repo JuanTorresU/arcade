@@ -333,10 +333,18 @@ std::vector<TrainingExample> AlphaSnakeTrainer::play_single_game(PredictFn predi
 }
 
 std::vector<TrainingExample> AlphaSnakeTrainer::run_self_play(int iteration) {
-  const int workers = std::max(1, std::min(cfg_.selfplay_workers, cfg_.games_per_iter));
+  // Auto-detect: workers son IO-bound (esperan GPU inference), así que
+  // podemos usar ~3x los cores sin saturar CPU.
+  int configured = cfg_.selfplay_workers;
+  const int hw = static_cast<int>(std::thread::hardware_concurrency());
+  if (hw > 0 && configured < hw) {
+    configured = std::max(configured, hw * 3);
+  }
+  const int workers = std::max(1, std::min(configured, cfg_.games_per_iter));
 
   std::cout << "  [Self-play] workers=" << workers << " games=" << cfg_.games_per_iter
-            << " sims=" << cfg_.num_simulations << "\n";
+            << " sims=" << cfg_.num_simulations
+            << " (hw_threads=" << hw << ")\n";
 
   std::vector<TrainingExample> all_examples;
   all_examples.reserve(static_cast<std::size_t>(cfg_.games_per_iter * 64));
@@ -383,11 +391,13 @@ std::vector<TrainingExample> AlphaSnakeTrainer::run_self_play(int iteration) {
     const double avg_states = st.batches > 0 ? static_cast<double>(st.states) / st.batches : 0.0;
     std::cout << "      [Heartbeat] games=" << completed.load() << "/" << cfg_.games_per_iter
               << " | positions=" << total_positions.load()
-              << " | infer_reqs=" << st.requests
-              << " | infer_states=" << st.states
-              << " | infer_batches=" << st.batches
-              << " | avg_states_batch=" << std::fixed << std::setprecision(1) << avg_states
-              << std::defaultfloat << "\n";
+              << " | batches=" << st.batches
+              << " | avg_batch=" << std::fixed << std::setprecision(1) << avg_states
+              << std::defaultfloat;
+    if (avg_states > 0.0 && avg_states < static_cast<double>(cfg_.inference_batch_size) * 0.25) {
+      std::cout << " [WARN: batch bajo, GPU ociosa]";
+    }
+    std::cout << "\n";
   }
 
   for (auto& th : pool) {

@@ -4,6 +4,7 @@
 #include <cmath>
 #include <cstring>
 #include <filesystem>
+#include <iostream>
 
 namespace fs = std::filesystem;
 
@@ -105,8 +106,33 @@ void PolicyValueModel::init(int board_size,
     device_ = torch::kCPU;
   }
 
+  if (device_.is_cuda()) {
+    // cuDNN Benchmark: busca el kernel de convolución más rápido para
+    // inputs de tamaño fijo (batch × 4 × 10 × 10). Se cachea tras la
+    // primera corrida; ideal para este modelo con shapes constantes.
+    at::globalContext().setBenchmarkCuDNN(true);
+
+    // TF32: usa Tensor Cores para operaciones FP32 con precisión TF32
+    // (mantissa 10-bit vs 23-bit). Pérdida despreciable para RL/NN,
+    // ~2x throughput en RTX 40xx (Ada Lovelace).
+    at::globalContext().setAllowTF32CuDNN(true);
+    at::globalContext().setAllowTF32Cublas(true);
+  }
+
   net_ = AlphaSnakeNet(board_size_, channels_, blocks_);
   net_->to(device_);
+
+  // CUDA warmup: la primera operación CUDA inicializa el contexto
+  // y cuDNN selecciona algoritmos (~300-500ms). Mejor hacerlo aquí
+  // que en la primera inferencia real.
+  if (device_.is_cuda()) {
+    torch::InferenceMode guard;
+    net_->eval();
+    auto warmup = torch::zeros({1, 4, board_size_, board_size_}).to(device_);
+    auto dummy = net_->forward(warmup);
+    (void)dummy;
+    std::cout << "  [GPU] CUDA warmup OK | cuDNN benchmark=ON | TF32=ON\n";
+  }
 
   optimizer_ = std::make_unique<torch::optim::AdamW>(
       net_->parameters(),
@@ -127,14 +153,15 @@ Prediction PolicyValueModel::predict(const std::vector<float>& state) const {
   }
 
   std::lock_guard<std::mutex> lock(infer_mu_);
-  torch::NoGradGuard no_grad;
+  // InferenceMode: más eficiente que NoGradGuard — desactiva autograd
+  // metadata y version counting, reduciendo overhead por tensor.
+  torch::InferenceMode guard;
   net_->eval();
 
   auto t = torch::from_blob(
                const_cast<float*>(state.data()),
                {1, 4, board_size_, board_size_},
-               torch::TensorOptions().dtype(torch::kFloat32))
-               .clone()
+               torch::kFloat32)
                .to(device_);
 
   auto out = net_->forward(t);
@@ -167,11 +194,12 @@ std::vector<Prediction> PolicyValueModel::predict_batch(
   }
 
   std::lock_guard<std::mutex> lock(infer_mu_);
-  torch::NoGradGuard no_grad;
+  torch::InferenceMode guard;
   net_->eval();
 
+  // .to(device_) ya crea un tensor nuevo en GPU — no necesitamos .clone()
+  // cuando el destino es CUDA (la copia CPU→GPU implica nuevo storage).
   auto x = torch::from_blob(flat.data(), {bs, 4, board_size_, board_size_}, torch::kFloat32)
-               .clone()
                .to(device_);
   auto pred = net_->forward(x);
   auto p = pred.first.to(torch::kCPU).contiguous();
@@ -230,11 +258,11 @@ LossStats PolicyValueModel::train_batch(const std::vector<TrainingExample>& batc
 
   const int64_t real_bs = static_cast<int64_t>(targets_v.size());
 
+  // .to(device_) con CUDA ya crea tensor nuevo — .clone() es redundante.
   auto x = torch::from_blob(states.data(), {real_bs, 4, board_size_, board_size_}, torch::kFloat32)
-               .clone()
                .to(device_);
-  auto y_p = torch::from_blob(targets_p.data(), {real_bs, 4}, torch::kFloat32).clone().to(device_);
-  auto y_v = torch::from_blob(targets_v.data(), {real_bs, 1}, torch::kFloat32).clone().to(device_);
+  auto y_p = torch::from_blob(targets_p.data(), {real_bs, 4}, torch::kFloat32).to(device_);
+  auto y_v = torch::from_blob(targets_v.data(), {real_bs, 1}, torch::kFloat32).to(device_);
 
   auto out = net_->forward(x);
   auto pred_p = out.first;

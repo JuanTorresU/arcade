@@ -451,33 +451,63 @@ EvalMetrics AlphaSnakeTrainer::evaluate_model(const PolicyValueModel& model,
     return out;
   }
 
-  int wins = 0;
-  long long len_sum = 0;
+  // Evaluación paralela con batching — misma estrategia que self-play.
+  const int hw = static_cast<int>(std::thread::hardware_concurrency());
+  const int eval_workers = std::max(1, std::min(games, std::max(16, hw * 2)));
 
-  for (int g = 0; g < games; ++g) {
-    const uint32_t seed = static_cast<uint32_t>(cfg_.seed + iteration_seed * 100000 + g);
-    SnakeEnv env(cfg_.board_size, cfg_.max_steps, seed);
+  InferenceBatcher infer_server(model, cfg_.inference_batch_size, cfg_.inference_wait_us);
+  infer_server.start();
 
-    int move = 0;
-    while (!env.is_done()) {
-      MCTS mcts(cfg_, model, seed + static_cast<uint32_t>(move * 17 + 3));
-      std::array<float, 4> pi = mcts.search(env, false, 0.0f);
-      const int action = argmax4(pi);
-      env.step(action);
-      ++move;
-      if (move > cfg_.max_steps + 8) {
-        break;
+  std::atomic<int> wins{0};
+  std::atomic<long long> len_sum{0};
+  std::atomic<int> next_game{0};
+  std::atomic<int> completed{0};
+
+  std::vector<std::thread> pool;
+  pool.reserve(static_cast<std::size_t>(eval_workers));
+
+  for (int w = 0; w < eval_workers; ++w) {
+    pool.emplace_back([&]() {
+      auto predict_fn = [&infer_server](const std::vector<float>& state) {
+        return infer_server.predict(state);
+      };
+      while (true) {
+        const int g = next_game.fetch_add(1);
+        if (g >= games) {
+          break;
+        }
+        const uint32_t seed = static_cast<uint32_t>(
+            cfg_.seed + iteration_seed * 100000 + g);
+        SnakeEnv env(cfg_.board_size, cfg_.max_steps, seed);
+
+        int move = 0;
+        while (!env.is_done()) {
+          MCTS mcts(cfg_, predict_fn, seed + static_cast<uint32_t>(move * 17 + 3));
+          std::array<float, 4> pi = mcts.search(env, false, 0.0f);
+          const int action = argmax4(pi);
+          env.step(action);
+          ++move;
+          if (move > cfg_.max_steps + 8) {
+            break;
+          }
+        }
+
+        if (env.is_win()) {
+          wins.fetch_add(1);
+        }
+        len_sum.fetch_add(static_cast<long long>(env.snake_length()));
+        completed.fetch_add(1);
       }
-    }
-
-    if (env.is_win()) {
-      ++wins;
-    }
-    len_sum += static_cast<long long>(env.snake_length());
+    });
   }
 
-  out.win_rate = static_cast<float>(wins) / static_cast<float>(games);
-  out.avg_length = static_cast<float>(len_sum) / static_cast<float>(games);
+  for (auto& th : pool) {
+    th.join();
+  }
+  infer_server.stop();
+
+  out.win_rate = static_cast<float>(wins.load()) / static_cast<float>(games);
+  out.avg_length = static_cast<float>(len_sum.load()) / static_cast<float>(games);
   return out;
 }
 

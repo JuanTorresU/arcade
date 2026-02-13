@@ -6,7 +6,7 @@ seed: 42
 
 env:
   board_size: 20
-  max_steps: 4000
+  max_steps: 2000
 
 model:
   channels: 64

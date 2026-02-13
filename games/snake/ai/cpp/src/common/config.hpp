@@ -7,7 +7,7 @@ namespace alphasnake {
 
 struct TrainConfig {
   int board_size = 20;
-  int max_steps = 4000;
+  int max_steps = 2000;
   int model_channels = 64;
   int model_blocks = 6;
   int num_simulations = 200;

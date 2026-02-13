@@ -178,6 +178,10 @@ TrainConfig with_profile(const TrainConfig& base, const std::string& profile) {
     cfg.food_samples = 2;
     cfg.games_per_iter = 128;
     cfg.eval_games = 40;
+    // Limitar duración de juegos: durante warmup la serpiente no aprende
+    // nada útil pasados ~1000 movimientos. Evita juegos "zombi" que
+    // sobreviven accidentalmente y tardan minutos en terminar.
+    cfg.max_steps = 1000;
     // GPU es el cuello de botella: no necesitamos muchos workers,
     // solo suficientes para llenar los batches de inferencia.
     cfg.selfplay_workers = std::max(32, cfg.selfplay_workers);

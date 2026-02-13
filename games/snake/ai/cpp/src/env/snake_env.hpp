@@ -49,6 +49,7 @@ class SnakeEnv {
   int board_size_ = 10;
   int max_steps_ = 1000;
   int steps_ = 0;
+  int steps_since_food_ = 0;  // pasos sin comer — mata juegos circulares
   int direction_ = 3;  // 0=UP 1=DOWN 2=LEFT 3=RIGHT
 
   bool done_ = false;

@@ -49,6 +49,7 @@ void SnakeEnv::reset() {
   done_ = false;
   won_ = false;
   steps_ = 0;
+  steps_since_food_ = 0;
   direction_ = 3;
 
   snake_.clear();
@@ -139,6 +140,7 @@ StepResult SnakeEnv::step(int action) {
   if (grow) {
     out.reward = 1.0f;
     out.food_eaten = true;
+    steps_since_food_ = 0;
     if (snake_.size() >= static_cast<std::size_t>(board_size_ * board_size_)) {
       done_ = true;
       won_ = true;
@@ -150,9 +152,24 @@ StepResult SnakeEnv::step(int action) {
   } else {
     snake_.pop_back();
     out.reward = 0.0f;
+    ++steps_since_food_;
   }
 
   ++steps_;
+
+  // Inanición: si la serpiente no come en board_size² pasos, termina.
+  // En 10x10 = 100 pasos hay tiempo de sobra para alcanzar cualquier
+  // celda. Esto mata juegos donde la serpiente da vueltas en círculos
+  // y desperdicia compute (~1000 movimientos MCTS inútiles).
+  const int starvation_limit = board_size_ * board_size_;
+  if (steps_since_food_ >= starvation_limit) {
+    done_ = true;
+    won_ = false;
+    out.done = true;
+    out.won = false;
+    return out;
+  }
+
   if (steps_ >= max_steps_) {
     done_ = true;
     won_ = false;

@@ -19,6 +19,7 @@ struct TrainConfig {
 
   float lr = 1e-3f;
   float weight_decay = 1e-4f;
+  float gamma = 0.99f;
   int batch_size = 128;
   std::size_t buffer_size = 200000;
   int epochs_per_iter = 10;

@@ -292,6 +292,7 @@ std::vector<TrainingExample> AlphaSnakeTrainer::play_single_game(PredictFn predi
 
   std::vector<std::vector<float>> states;
   std::vector<std::array<float, 4>> policies;
+  std::vector<float> rewards;
 
   int move = 0;
   while (!env.is_done()) {
@@ -304,7 +305,7 @@ std::vector<TrainingExample> AlphaSnakeTrainer::play_single_game(PredictFn predi
 
     const int action = sample_action(pi, rng);
     StepResult step = env.step(action);
-    (void)step;
+    rewards.push_back(step.reward);
 
     ++move;
     if (move > cfg_.max_steps + 8) {
@@ -312,13 +313,16 @@ std::vector<TrainingExample> AlphaSnakeTrainer::play_single_game(PredictFn predi
     }
   }
 
-  // Valor normalizado: longitud de serpiente mapeada a [-1, +1].
-  // Ganar (llenar el tablero) = +1.0, morir con longitud mínima ≈ -0.94.
-  // Esto da señal al value head en vez de -1 constante.
-  const float max_cells = static_cast<float>(cfg_.board_size * cfg_.board_size);
-  const float z = env.is_win()
-      ? 1.0f
-      : (2.0f * static_cast<float>(env.snake_length()) / max_cells - 1.0f);
+  // Discounted returns: calcular retorno descontado por posición.
+  // G_t = r_t + gamma * r_{t+1} + gamma² * r_{t+2} + ...
+  // Esto da señal fuerte al value head: posiciones cerca de comida
+  // reciben valores positivos, posiciones cerca de muerte negativos.
+  std::vector<float> returns(rewards.size(), 0.0f);
+  float G = 0.0f;
+  for (int t = static_cast<int>(rewards.size()) - 1; t >= 0; --t) {
+    G = rewards[static_cast<std::size_t>(t)] + cfg_.gamma * G;
+    returns[static_cast<std::size_t>(t)] = std::max(-1.0f, std::min(1.0f, G));
+  }
 
   std::vector<TrainingExample> examples;
   examples.reserve(states.size());
@@ -326,7 +330,7 @@ std::vector<TrainingExample> AlphaSnakeTrainer::play_single_game(PredictFn predi
     TrainingExample ex;
     ex.state = std::move(states[i]);
     ex.policy = policies[i];
-    ex.outcome = z;
+    ex.outcome = returns[i];
     examples.push_back(std::move(ex));
   }
   return examples;

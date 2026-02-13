@@ -33,6 +33,7 @@ train:
   batch_size: 128
   buffer: 200000
   epochs: 10
+  gamma: 0.99
 
 eval:
   games: 200

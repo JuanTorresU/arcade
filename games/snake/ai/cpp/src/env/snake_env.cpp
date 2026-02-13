@@ -165,6 +165,7 @@ StepResult SnakeEnv::step(int action) {
   if (steps_since_food_ >= starvation_limit) {
     done_ = true;
     won_ = false;
+    out.reward = -1.0f;
     out.done = true;
     out.won = false;
     return out;

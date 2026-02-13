@@ -129,6 +129,8 @@ bool load_config_file(const std::string& path, TrainConfig& cfg, std::string& er
       if (!set_float(cfg.lr)) return false;
     } else if (full == "train.weight_decay" || full == "weight_decay") {
       if (!set_float(cfg.weight_decay)) return false;
+    } else if (full == "train.gamma" || full == "gamma") {
+      if (!set_float(cfg.gamma)) return false;
     } else if (full == "train.batch_size" || full == "batch_size") {
       if (!set_int(cfg.batch_size)) return false;
     } else if (full == "train.buffer" || full == "buffer_size") {

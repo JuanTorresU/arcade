@@ -1,0 +1,9 @@
+node_modules/
+__pycache__/
+*.pyc
+.env
+.DS_Store
+*.log
+sounds/*.wav
+games/snake/ai/cpp/build/
+games/snake/ai/cpp/.cache/

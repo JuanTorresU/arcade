@@ -1,0 +1,14 @@
+{
+  "SPEED_UP": { "description": "Aumenta velocidad de la serpiente", "cooldownMs": 3000 },
+  "NUKE": { "description": "Corta el cuerpo de la serpiente a solo 3 segmentos", "cooldownMs": 10000 },
+  "CHAOS": { "description": "Modo caos: invierte controles + velocidad extrema", "durationMs": 8000 },
+  "SHIELD": { "description": "Escudo protector: inmunidad durante 3 segundos", "durationMs": 3000, "cooldownMs": 5000 },
+  "MEGA_SHIELD": { "description": "Mega escudo: inmunidad durante 10 segundos", "durationMs": 10000, "cooldownMs": 30000 },
+  "SPAWN_FRUITS": { "description": "Lluvia de frutas en el mapa", "cooldownMs": 5000 },
+  "BONUS_POINTS": { "description": "Regala puntos de golpe", "cooldownMs": 3000 },
+  "MEGA_BONUS": { "description": "Regala 2000 puntos de golpe", "cooldownMs": 30000 },
+  "RAIN_FRUITS": { "description": "Lluvia masiva de 100 frutas (goal reward)", "cooldownMs": 60000 },
+  "INVINCIBLE": { "description": "Inmunidad 15 segundos (goal reward)", "durationMs": 15000, "cooldownMs": 60000 },
+  "DOUBLE_SCORE": { "description": "Score x2 durante 30 segundos (goal reward)", "durationMs": 30000, "cooldownMs": 120000 },
+  "SUPER_EVENT": { "description": "Mega evento especial (goal reward)", "cooldownMs": 120000 }
+}

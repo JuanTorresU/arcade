@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Arcade Overlay</title>
+  <link rel="stylesheet" href="overlay.css" />
+</head>
+<body>
+  <div id="overlay">
+    <div class="panel score-panel">
+      <span class="label">SCORE</span>
+      <span id="score">0</span>
+    </div>
+    <div class="panel record-panel">
+      <span class="label">RÉCORD</span>
+      <span id="record">0</span>
+    </div>
+    <div class="panel last-donor">
+      <span class="label">ÚLTIMO DONADOR</span>
+      <span id="last-donor">—</span>
+    </div>
+
+    <!-- Combo -->
+    <div class="panel combo-panel" id="combo-panel" style="display:none;">
+      <span class="label">COMBO</span>
+      <span id="combo-value">x1</span>
+    </div>
+
+    <!-- Donor War -->
+    <div class="panel war-panel">
+      <div class="war-label-row">
+        <span class="war-team war-help">🛡 HELP <span id="war-help-count">0</span></span>
+        <span class="war-vs">VS</span>
+        <span class="war-team war-destroy">💀 DESTROY <span id="war-destroy-count">0</span></span>
+      </div>
+      <div class="war-bar">
+        <div class="war-bar-fill war-bar-help" id="war-bar-help" style="width:50%"></div>
+        <div class="war-bar-fill war-bar-destroy" id="war-bar-destroy" style="width:50%"></div>
+      </div>
+    </div>
+
+    <div class="panel top-donors-panel">
+      <span class="label">TOP 5 DONADORES (SESIÓN)</span>
+      <ul id="top5-list" class="top5-list"></ul>
+    </div>
+    <div class="panel king-panel">
+      <span class="label">REY DONADOR (HISTORIA)</span>
+      <span id="king-name">—</span>
+      <span id="king-count" class="king-count"></span>
+    </div>
+
+    <!-- Alert -->
+    <div class="panel alert" id="alert-box">
+      <span id="alert-text"></span>
+    </div>
+
+    <!-- CTA fijo (se rellena desde giftsConfig por overlay.js) -->
+    <div id="cta-bar">
+      <div id="cta-content"></div>
+    </div>
+  </div>
+  <script src="overlay.js"></script>
+</body>
+</html>

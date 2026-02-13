@@ -1,0 +1,282 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Arcade Bot Network — Selección de Juegos</title>
+  <link rel="stylesheet" href="shared/styles.css" />
+  <style>
+    body {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      overflow: auto;
+    }
+
+    .games-menu {
+      text-align: center;
+      padding: 2rem;
+      max-width: 800px;
+      width: 100%;
+    }
+
+    .games-menu h1 {
+      font-size: 3rem;
+      font-weight: 800;
+      margin-bottom: 0.5rem;
+      background: linear-gradient(135deg, var(--accent), var(--accent-pink), var(--accent-purple));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      text-shadow: 0 0 40px rgba(0, 255, 180, 0.5);
+    }
+
+    .games-menu .subtitle {
+      font-size: 1.2rem;
+      color: rgba(255, 255, 255, 0.7);
+      margin-bottom: 3rem;
+    }
+
+    .games-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+      gap: 2rem;
+      margin-top: 2rem;
+    }
+
+    .game-card {
+      background: linear-gradient(135deg, rgba(0, 255, 180, 0.1), rgba(255, 45, 146, 0.1));
+      border: 2px solid transparent;
+      border-radius: 16px;
+      padding: 2rem;
+      text-decoration: none;
+      color: #fff;
+      transition: all 0.3s ease;
+      position: relative;
+      overflow: hidden;
+      backdrop-filter: blur(10px);
+    }
+
+    .game-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      border-radius: 16px;
+      padding: 2px;
+      background: linear-gradient(135deg, var(--accent), var(--accent-pink), var(--accent-purple), var(--accent));
+      -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+      -webkit-mask-composite: xor;
+      mask-composite: exclude;
+      opacity: 0;
+      transition: opacity 0.3s ease;
+    }
+
+    .game-card:hover {
+      transform: translateY(-8px);
+      box-shadow: 0 20px 60px rgba(0, 255, 180, 0.3),
+                  0 0 40px rgba(255, 45, 146, 0.2);
+    }
+
+    .game-card:hover::before {
+      opacity: 1;
+    }
+
+    .game-card .emoji {
+      font-size: 4rem;
+      display: block;
+      margin-bottom: 1rem;
+      filter: drop-shadow(0 0 20px rgba(0, 255, 180, 0.5));
+    }
+
+    .game-card h2 {
+      font-size: 1.8rem;
+      font-weight: 700;
+      margin-bottom: 0.5rem;
+      color: var(--accent);
+    }
+
+    .game-card .description {
+      font-size: 0.95rem;
+      color: rgba(255, 255, 255, 0.7);
+      line-height: 1.6;
+      margin-top: 0.5rem;
+    }
+
+    .game-card .features {
+      margin-top: 1rem;
+      font-size: 0.85rem;
+      color: rgba(255, 255, 255, 0.6);
+      text-align: left;
+    }
+
+    .game-card .features li {
+      margin: 0.3rem 0;
+      list-style: none;
+      padding-left: 1.2rem;
+      position: relative;
+    }
+
+    .game-card .features li::before {
+      content: '▸';
+      position: absolute;
+      left: 0;
+      color: var(--accent);
+    }
+
+    .status-indicator {
+      display: inline-block;
+      width: 10px;
+      height: 10px;
+      border-radius: 50%;
+      background: var(--accent);
+      box-shadow: 0 0 10px var(--accent);
+      margin-right: 0.5rem;
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { opacity: 1; }
+      50% { opacity: 0.5; }
+    }
+
+    .footer-info {
+      margin-top: 3rem;
+      padding-top: 2rem;
+      border-top: 1px solid rgba(255, 255, 255, 0.1);
+      font-size: 0.9rem;
+      color: rgba(255, 255, 255, 0.5);
+    }
+  </style>
+</head>
+<body>
+  <div class="games-menu">
+    <h1>ARCADE BOT NETWORK</h1>
+    <p class="subtitle">Sistema de micro-juegos conectados a TikTok Live</p>
+
+    <div class="games-grid">
+      <a href="snake/" class="game-card">
+        <span class="emoji">🐍</span>
+        <h2>Snake</h2>
+        <p class="description">
+          La serpiente clásica con efectos visuales y sonoros. Controla el destino con regalos.
+        </p>
+        <ul class="features">
+          <li>Bot autoplayer inteligente</li>
+          <li>Efectos: velocidad, nuke, caos, shield</li>
+          <li>Donor War: Help vs Destroy</li>
+          <li>Sistema de combos</li>
+        </ul>
+      </a>
+
+      <a href="tetris/" class="game-card">
+        <span class="emoji">🧩</span>
+        <h2>Tetris</h2>
+        <p class="description">
+          El puzzle legendario. Añade basura o limpia líneas con regalos de TikTok.
+        </p>
+        <ul class="features">
+          <li>Bot con heurística avanzada</li>
+          <li>Efectos: velocidad, basura, caos, shield</li>
+          <li>Niveles y puntuación progresiva</li>
+          <li>Pieza fantasma y preview</li>
+        </ul>
+      </a>
+
+      <a href="breakout/" class="game-card">
+        <span class="emoji">🎯</span>
+        <h2>Breakout</h2>
+        <p class="description">
+          Rompe todos los bloques con la pelota. Paleta controlada por bot.
+        </p>
+        <ul class="features">
+          <li>Bot sigue la pelota</li>
+          <li>Efectos: velocidad, nuke, shield, caos</li>
+          <li>Bloques con colores HSL dinámicos</li>
+          <li>Niveles infinitos</li>
+        </ul>
+      </a>
+
+      <a href="pong/" class="game-card">
+        <span class="emoji">🏓</span>
+        <h2>Pong</h2>
+        <p class="description">
+          Ping pong clásico. Bot controla una paleta, compite contra otra.
+        </p>
+        <ul class="features">
+          <li>Bot defensivo inteligente</li>
+          <li>Efectos: velocidad, caos, shield</li>
+          <li>Primero en llegar a 5 gana</li>
+          <li>Estilo neón retro</li>
+        </ul>
+      </a>
+
+      <a href="flappy/" class="game-card">
+        <span class="emoji">🐦</span>
+        <h2>Flappy</h2>
+        <p class="description">
+          Esquiva los obstáculos volando. Bot salta automáticamente.
+        </p>
+        <ul class="features">
+          <li>Bot calcula saltos perfectos</li>
+          <li>Efectos: velocidad, invert, shield</li>
+          <li>Puntuación por obstáculo pasado</li>
+          <li>Gravedad invertible</li>
+        </ul>
+      </a>
+
+      <a href="dodge/" class="game-card">
+        <span class="emoji">⚡</span>
+        <h2>Dodge</h2>
+        <p class="description">
+          Esquiva obstáculos que caen. Bot encuentra el espacio libre.
+        </p>
+        <ul class="features">
+          <li>Bot evade inteligentemente</li>
+          <li>Efectos: velocidad, nuke, shield, caos</li>
+          <li>Puntuación por obstáculo evitado</li>
+          <li>Controles invertibles</li>
+        </ul>
+      </a>
+
+      <a href="snake/ai.html" class="game-card">
+        <span class="emoji">🧠</span>
+        <h2>AlphaSnake AI 10x10</h2>
+        <p class="description">
+          Snake 10x10 controlado por red neuronal AlphaZero con MCTS.
+        </p>
+        <ul class="features">
+          <li>Red neuronal ResNet (policy + value)</li>
+          <li>MCTS con 100-400 simulaciones</li>
+          <li>Modo policy-only (rápido) y MCTS (fuerte)</li>
+          <li>Sin efectos TikTok — IA pura</li>
+        </ul>
+      </a>
+
+      <a href="snake/ai20.html" class="game-card">
+        <span class="emoji">🧠</span>
+        <h2>AlphaSnake AI 20x20</h2>
+        <p class="description">
+          Snake 20x20 controlado por red neuronal AlphaZero con MCTS. Tablero completo.
+        </p>
+        <ul class="features">
+          <li>Red neuronal ResNet grande (128ch, 10 bloques)</li>
+          <li>MCTS con 100-400 simulaciones</li>
+          <li>Modo policy-only (rápido) y MCTS (fuerte)</li>
+          <li>Tablero tamaño real TikTok — IA pura</li>
+        </ul>
+      </a>
+    </div>
+
+    <div class="footer-info">
+      <p>
+        <span class="status-indicator"></span>
+        Control Server: <code>ws://localhost:8765</code>
+      </p>
+      <p style="margin-top: 0.5rem;">
+        Cada juego se ejecuta automáticamente y responde a eventos de TikTok Live en tiempo real.
+      </p>
+    </div>
+  </div>
+</body>
+</html>

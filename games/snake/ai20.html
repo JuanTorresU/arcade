@@ -1,0 +1,399 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>AlphaSnake AI 20x20 — Demo</title>
+  <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@600;700;800&display=swap" rel="stylesheet" />
+  <style>
+    :root {
+      --bg-dark: #0d0d14;
+      --accent: #00ffb4;
+      --accent-pink: #ff2d92;
+      --accent-purple: #b24bf3;
+      --accent-cyan: #00e5ff;
+      --gold: #ffd700;
+      --font: 'Outfit', system-ui, sans-serif;
+      --panel-bg: linear-gradient(135deg, rgba(20,20,35,0.92) 0%, rgba(30,15,45,0.88) 100%);
+      --panel-border: 1px solid rgba(255,255,255,0.12);
+      --panel-shadow: 0 4px 24px rgba(0,0,0,0.4), 0 0 20px rgba(0,255,180,0.08);
+    }
+    * { margin:0; padding:0; box-sizing:border-box; }
+    html, body {
+      width:100%; height:100%; overflow:hidden;
+      background: var(--bg-dark);
+      font-family: var(--font);
+      color: #fff;
+    }
+    body {
+      background: linear-gradient(135deg, #0d0d14 0%, #1a0a2e 40%, #0d1a1a 70%, #0d0d14 100%);
+      display: flex; align-items: center; justify-content: center;
+    }
+    body::before {
+      content:''; position:fixed; inset:0; z-index:0; pointer-events:none;
+      background-image: radial-gradient(circle, rgba(255,255,255,0.045) 1px, transparent 1px);
+      background-size: 22px 22px;
+    }
+
+    #app {
+      position: relative; z-index: 1;
+      display: flex; gap: 24px; align-items: flex-start;
+    }
+
+    /* Canvas container */
+    #game-area {
+      position: relative;
+      border-radius: 16px; overflow: hidden;
+      box-shadow: 0 0 40px rgba(0,229,255,0.15), 0 8px 32px rgba(0,0,0,0.6);
+    }
+    #game-canvas {
+      display: block;
+      border-radius: 16px;
+    }
+    .live-pill {
+      position: absolute; top: 10px; left: 10px;
+      background: rgba(255,45,146,0.85); color: #fff;
+      font-size: 11px; font-weight: 700; padding: 3px 10px;
+      border-radius: 20px; letter-spacing: 1px;
+      text-shadow: 0 0 6px rgba(255,45,146,0.6);
+      z-index: 2;
+    }
+    .ai-badge {
+      position: absolute; top: 10px; right: 10px;
+      background: linear-gradient(135deg, var(--accent-purple), var(--accent-cyan));
+      color: #fff; font-size: 11px; font-weight: 800;
+      padding: 3px 12px; border-radius: 20px; letter-spacing: 1.5px;
+      z-index: 2;
+    }
+
+    /* Panel lateral */
+    #panel {
+      width: 260px; display: flex; flex-direction: column; gap: 12px;
+    }
+    .card {
+      background: var(--panel-bg);
+      border: var(--panel-border);
+      border-radius: 12px; padding: 14px 16px;
+      box-shadow: var(--panel-shadow);
+    }
+    .card-title {
+      font-size: 11px; font-weight: 700; letter-spacing: 2px;
+      color: rgba(255,255,255,0.5); text-transform: uppercase;
+      margin-bottom: 6px;
+    }
+    .card-value {
+      font-size: 28px; font-weight: 800;
+      background: linear-gradient(135deg, var(--accent), var(--accent-cyan));
+      -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .card-value.small { font-size: 18px; }
+    .card-sub {
+      font-size: 12px; color: rgba(255,255,255,0.4); margin-top: 2px;
+    }
+
+    /* Stats grid */
+    .stats-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    .stat-box {
+      background: rgba(255,255,255,0.04);
+      border-radius: 8px; padding: 8px 10px; text-align: center;
+    }
+    .stat-label { font-size: 10px; color: rgba(255,255,255,0.4); letter-spacing: 1px; text-transform: uppercase; }
+    .stat-value { font-size: 20px; font-weight: 800; color: var(--accent); }
+
+    /* Controls */
+    .control-group { display: flex; flex-direction: column; gap: 8px; }
+    .control-row { display: flex; align-items: center; justify-content: space-between; }
+    .control-label { font-size: 12px; color: rgba(255,255,255,0.6); }
+    .control-value { font-size: 12px; font-weight: 700; color: var(--accent-cyan); min-width: 40px; text-align: right; }
+
+    /* Toggle buttons */
+    .toggle-group { display: flex; gap: 4px; }
+    .toggle-btn {
+      flex: 1; padding: 8px 0; border: none; border-radius: 8px;
+      font-family: var(--font); font-size: 12px; font-weight: 700;
+      cursor: pointer; transition: all 0.2s;
+      background: rgba(255,255,255,0.06); color: rgba(255,255,255,0.5);
+      letter-spacing: 1px;
+    }
+    .toggle-btn.active {
+      background: linear-gradient(135deg, var(--accent-purple), var(--accent-cyan));
+      color: #fff; box-shadow: 0 0 12px rgba(0,229,255,0.3);
+    }
+
+    /* Slider */
+    input[type="range"] {
+      -webkit-appearance: none; width: 100%; height: 4px;
+      background: rgba(255,255,255,0.1); border-radius: 2px; outline: none;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 14px; height: 14px;
+      background: var(--accent-cyan); border-radius: 50%; cursor: pointer;
+      box-shadow: 0 0 8px rgba(0,229,255,0.5);
+    }
+
+    /* Action button */
+    .btn-action {
+      width: 100%; padding: 12px; border: none; border-radius: 10px;
+      font-family: var(--font); font-size: 14px; font-weight: 800;
+      cursor: pointer; transition: all 0.2s; letter-spacing: 1px;
+    }
+    .btn-start {
+      background: linear-gradient(135deg, var(--accent), #00b894);
+      color: #0d0d14; box-shadow: 0 0 20px rgba(0,255,180,0.3);
+    }
+    .btn-stop {
+      background: linear-gradient(135deg, var(--accent-pink), #e74c3c);
+      color: #fff; box-shadow: 0 0 20px rgba(255,45,146,0.3);
+    }
+    .btn-action:hover { transform: scale(1.02); filter: brightness(1.1); }
+
+    /* Status */
+    #status {
+      font-size: 12px; text-align: center; padding: 6px;
+      border-radius: 8px; background: rgba(255,255,255,0.04);
+      color: rgba(255,255,255,0.5);
+    }
+    #status.loaded { color: var(--accent); }
+    #status.error { color: var(--accent-pink); }
+  </style>
+</head>
+<body>
+  <div id="app">
+    <!-- Game Canvas -->
+    <div id="game-area">
+      <div class="live-pill">ALPHASNAKE 20x20</div>
+      <div class="ai-badge">AI MODE</div>
+      <canvas id="game-canvas"></canvas>
+    </div>
+
+    <!-- Control Panel -->
+    <div id="panel">
+      <!-- Status -->
+      <div class="card">
+        <div id="status">Cargando modelo 20x20...</div>
+      </div>
+
+      <!-- Score -->
+      <div class="card">
+        <div class="card-title">SCORE ACTUAL</div>
+        <div class="card-value" id="score">0</div>
+        <div class="card-sub">de 397 (20x20)</div>
+      </div>
+
+      <!-- Stats -->
+      <div class="card">
+        <div class="card-title">ESTADISTICAS</div>
+        <div class="stats-grid">
+          <div class="stat-box">
+            <div class="stat-label">JUEGOS</div>
+            <div class="stat-value" id="stat-games">0</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">WINS</div>
+            <div class="stat-value" id="stat-wins">0</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">WIN RATE</div>
+            <div class="stat-value" id="stat-wr">0%</div>
+          </div>
+          <div class="stat-box">
+            <div class="stat-label">AVG SCORE</div>
+            <div class="stat-value" id="stat-avg">0</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Mode Toggle -->
+      <div class="card">
+        <div class="card-title">MODO DE INFERENCIA</div>
+        <div class="toggle-group">
+          <button class="toggle-btn active" id="btn-policy" onclick="setAIMode('policy')">POLICY</button>
+          <button class="toggle-btn" id="btn-mcts" onclick="setAIMode('mcts')">MCTS</button>
+        </div>
+      </div>
+
+      <!-- Speed Slider -->
+      <div class="card">
+        <div class="card-title">VELOCIDAD</div>
+        <div class="control-group">
+          <div class="control-row">
+            <span class="control-label">Intervalo por jugada</span>
+            <span class="control-value" id="speed-value">150ms</span>
+          </div>
+          <input type="range" id="speed-slider" min="20" max="500" value="150" step="10"
+                 oninput="updateSpeed(this.value)" />
+        </div>
+      </div>
+
+      <!-- MCTS Simulations (only for MCTS mode) -->
+      <div class="card" id="mcts-options" style="display:none;">
+        <div class="card-title">MCTS SIMULACIONES</div>
+        <div class="control-group">
+          <div class="control-row">
+            <span class="control-label">Por jugada</span>
+            <span class="control-value" id="sims-value">100</span>
+          </div>
+          <input type="range" id="sims-slider" min="10" max="400" value="100" step="10"
+                 oninput="updateSims(this.value)" />
+        </div>
+      </div>
+
+      <!-- Start/Stop -->
+      <button class="btn-action btn-start" id="btn-toggle" onclick="toggleAI()">
+        INICIAR AI
+      </button>
+    </div>
+  </div>
+
+  <!-- ONNX Runtime Web -->
+  <script src="https://cdn.jsdelivr.net/npm/onnxruntime-web@1.17.0/dist/ort.min.js"></script>
+  <!-- Engine (modo AI 20x20) + AI Bot -->
+  <script src="engine.js"></script>
+  <script src="ai-bot.js"></script>
+
+  <script>
+    var aiRunning = false;
+    var currentMode = 'policy';
+    var MODEL_URL = 'ai/alphasnake_20x20.onnx';
+
+    // Inicializar engine en modo AI 20x20
+    document.addEventListener('DOMContentLoaded', async function () {
+      // Configurar engine en modo AI 20x20
+      SnakeEngine.setMode('ai20');
+
+      // Configurar AI Bot
+      AIBot.setEngine(SnakeEngine);
+      AIBot.setMode(currentMode);
+      AIBot.setSimulations(parseInt(document.getElementById('sims-slider').value, 10));
+      AIBot.onStats(updateStats);
+
+      // Cargar modelo ONNX 20x20
+      var statusEl = document.getElementById('status');
+      try {
+        var loaded = await AIBot.loadModel(MODEL_URL);
+        if (loaded) {
+          statusEl.textContent = 'Modelo 20x20 cargado — Listo para jugar';
+          statusEl.className = 'loaded';
+        } else {
+          statusEl.textContent = 'Error: no se pudo cargar el modelo ONNX 20x20';
+          statusEl.className = 'error';
+        }
+      } catch (err) {
+        statusEl.textContent = 'Error: ' + err.message;
+        statusEl.className = 'error';
+        console.error(err);
+      }
+
+      // Actualizar score en cada tick del engine
+      SnakeEngine.onEffect(function (type) {
+        if (type === 'eat' || type === 'death' || type === 'reset') {
+          var state = SnakeEngine.getState();
+          document.getElementById('score').textContent = state.score;
+        }
+      });
+
+      // Polling para score update
+      setInterval(function () {
+        if (aiRunning) {
+          var state = SnakeEngine.getState();
+          document.getElementById('score').textContent = state.score;
+        }
+      }, 200);
+    });
+
+    function updateStats(stats) {
+      document.getElementById('stat-games').textContent = stats.games;
+      document.getElementById('stat-wins').textContent = stats.wins;
+      document.getElementById('stat-wr').textContent =
+        stats.games > 0 ? (100 * stats.wins / stats.games).toFixed(1) + '%' : '0%';
+      document.getElementById('stat-avg').textContent =
+        stats.games > 0 ? (stats.totalScore / stats.games).toFixed(1) : '0';
+    }
+
+    function setAIMode(mode) {
+      currentMode = mode;
+      AIBot.setMode(mode);
+
+      document.getElementById('btn-policy').className =
+        'toggle-btn' + (mode === 'policy' ? ' active' : '');
+      document.getElementById('btn-mcts').className =
+        'toggle-btn' + (mode === 'mcts' ? ' active' : '');
+      document.getElementById('mcts-options').style.display =
+        mode === 'mcts' ? 'block' : 'none';
+
+      if (aiRunning) {
+        AIBot.stop();
+        if (mode === 'mcts') {
+          initAndStartMCTS();
+        } else {
+          AIBot.start(parseInt(document.getElementById('speed-slider').value));
+        }
+      }
+    }
+
+    function updateSpeed(val) {
+      document.getElementById('speed-value').textContent = val + 'ms';
+      AIBot.setInterval(parseInt(val));
+      if (aiRunning) {
+        AIBot.stop();
+        AIBot.start(parseInt(val));
+      }
+    }
+
+    function updateSims(val) {
+      document.getElementById('sims-value').textContent = val;
+      AIBot.setSimulations(parseInt(val));
+    }
+
+    async function initAndStartMCTS() {
+      var statusEl = document.getElementById('status');
+      statusEl.textContent = 'Inicializando MCTS Worker...';
+      try {
+        await AIBot.initMCTSWorker(MODEL_URL);
+        statusEl.textContent = 'MCTS Worker listo — Jugando';
+        statusEl.className = 'loaded';
+        AIBot.start(parseInt(document.getElementById('speed-slider').value));
+      } catch (err) {
+        statusEl.textContent = 'Error MCTS: ' + err.message;
+        statusEl.className = 'error';
+      }
+    }
+
+    async function toggleAI() {
+      var btn = document.getElementById('btn-toggle');
+      var statusEl = document.getElementById('status');
+
+      if (aiRunning) {
+        AIBot.stop();
+        aiRunning = false;
+        btn.textContent = 'INICIAR AI';
+        btn.className = 'btn-action btn-start';
+        statusEl.textContent = 'AI detenida';
+        statusEl.className = '';
+      } else {
+        if (!AIBot.isLoaded()) {
+          statusEl.textContent = 'Modelo no cargado. Coloca alphasnake_20x20.onnx en games/snake/ai/';
+          statusEl.className = 'error';
+          return;
+        }
+
+        aiRunning = true;
+        btn.textContent = 'DETENER AI';
+        btn.className = 'btn-action btn-stop';
+        statusEl.textContent = 'AI jugando en modo ' + currentMode.toUpperCase();
+        statusEl.className = 'loaded';
+
+        SnakeEngine.resetGame();
+        AIBot.resetStats();
+
+        if (currentMode === 'mcts') {
+          await initAndStartMCTS();
+        } else {
+          AIBot.start(parseInt(document.getElementById('speed-slider').value));
+        }
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,37 @@
+# AlphaSnake C++ config (paper-faithful 10x10 baseline)
+
+profile: paper_strict
+save_dir: /workspace/alphasnake_paper_10x10
+seed: 42
+
+env:
+  board_size: 10
+  max_steps: 1000
+
+mcts:
+  simulations: 400
+  cpuct: 1.0
+  dir_alpha: 0.03
+  dir_eps: 0.25
+  food_samples: 8
+
+selfplay:
+  games: 1000
+  workers: 8
+  temp_decay: 30
+
+train:
+  iterations: 200
+  lr: 0.001
+  weight_decay: 0.0001
+  batch_size: 128
+  buffer: 200000
+  epochs: 10
+
+eval:
+  games: 200
+  accept_threshold: 0.55
+
+schedule:
+  warmup_iterations: 60
+  strict_iterations: 12

@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Simulador de donaciones — Arcade Bot</title>
+  <style>
+    :root {
+      --bg: #0f0f18;
+      --accent: #00ffb4;
+      --border: rgba(0, 255, 180, 0.3);
+      --font: "JetBrains Mono", "Fira Code", monospace;
+    }
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--accent);
+      padding: 24px;
+      min-height: 100vh;
+    }
+    h1 { font-size: 18px; margin-bottom: 20px; }
+    .status {
+      display: inline-block;
+      width: 8px; height: 8px;
+      border-radius: 50%;
+      background: #666;
+      margin-right: 8px;
+    }
+    .status.connected { background: #0f0; }
+    .status.disconnected { background: #f44; }
+    .row { margin-bottom: 16px; }
+    label { display: block; font-size: 11px; text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 6px; opacity: 0.9; }
+    input, select, button {
+      font-family: inherit;
+      font-size: 14px;
+      padding: 10px 12px;
+      background: rgba(0, 255, 180, 0.08);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--accent);
+    }
+    input { width: 100%; max-width: 280px; }
+    select { min-width: 160px; cursor: pointer; }
+    button {
+      cursor: pointer;
+      margin-top: 8px;
+      margin-right: 8px;
+    }
+    button:hover { background: rgba(0, 255, 180, 0.15); }
+    .gifts {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-top: 8px;
+    }
+    .gifts button { margin: 0; min-width: 90px; transition: background 0.15s; }
+    .gifts button.gift-destroy { border-color: rgba(255, 45, 146, 0.5); color: #ff2d92; }
+    .gifts button.gift-destroy:hover { background: rgba(255, 45, 146, 0.15); }
+    .gifts button.gift-help { border-color: rgba(0, 255, 180, 0.5); color: #00ffb4; }
+    .gifts button.gift-help:hover { background: rgba(0, 255, 180, 0.15); }
+    .log {
+      margin-top: 24px;
+      font-size: 11px;
+      color: rgba(0, 255, 180, 0.7);
+      max-height: 200px;
+      overflow-y: auto;
+    }
+    .log div { padding: 4px 0; border-bottom: 1px solid rgba(0,255,180,0.1); }
+  </style>
+</head>
+<body>
+  <h1><span id="status-dot" class="status"></span> Simulador de donaciones</h1>
+  <p style="font-size: 12px; opacity: 0.8; margin-bottom: 20px;">Conecta al Control Server y envía eventos de regalos como si fueran de TikTok Live.</p>
+
+  <div class="row">
+    <label>Usuario (nombre del donador)</label>
+    <input type="text" id="username" value="UsuarioPrueba" placeholder="ej. Juan_2024" />
+  </div>
+
+  <div class="row">
+    <label>Cantidad (regalos en un solo envío)</label>
+    <input type="number" id="count" value="1" min="1" max="999" style="max-width: 100px;" />
+  </div>
+
+  <div class="row">
+    <label>Enviar un regalo</label>
+    <div class="gifts" id="gift-buttons"></div>
+  </div>
+
+  <div class="row">
+    <label>O elegir y enviar</label>
+    <select id="gift-select">
+      <option value="">— Cargando regalos… —</option>
+    </select>
+    <button type="button" id="btn-send">Enviar regalo</button>
+  </div>
+
+  <div class="row" style="margin-top: 22px; padding-top: 16px; border-top: 1px solid rgba(0,255,180,0.18);">
+    <label>Configuración del juego (se aplica en vivo)</label>
+    <div style="display:flex; flex-wrap:wrap; gap:12px; align-items:flex-end;">
+      <div>
+        <label style="margin-top:0;">Preset SFX (regalos)</label>
+        <select id="cfg-sfx-preset">
+          <option value="clean">clean (futurista)</option>
+          <option value="retro">retro (8-bit)</option>
+          <option value="heavy">heavy (agresivo)</option>
+        </select>
+      </div>
+      <div>
+        <label style="margin-top:0;">Volumen SFX</label>
+        <input id="cfg-sfx-vol" type="range" min="0" max="3" step="0.1" value="1.8" style="width:220px;" />
+        <div id="cfg-sfx-vol-val" style="font-size:11px; opacity:0.8; margin-top:4px;">1.8</div>
+      </div>
+      <div>
+        <label style="margin-top:0;">Volumen música</label>
+        <input id="cfg-music-vol" type="range" min="0" max="1" step="0.05" value="0.25" style="width:220px;" />
+        <div id="cfg-music-vol-val" style="font-size:11px; opacity:0.8; margin-top:4px;">0.25</div>
+      </div>
+      <div>
+        <button type="button" id="btn-start-music">Reintentar iniciar música</button>
+      </div>
+    </div>
+    <div style="margin-top:10px; font-size:11px; opacity:0.75;">
+      Nota: estos cambios se envían por WebSocket al Control Server y el juego los aplica sin recargar.
+    </div>
+  </div>
+
+  <div class="row">
+    <label>Últimos envíos</label>
+    <div class="log" id="log"></div>
+  </div>
+
+  <script>
+    (function () {
+      var WS_URL = 'ws://localhost:8765';
+      var ws = null;
+      var statusDot = document.getElementById('status-dot');
+      var usernameInput = document.getElementById('username');
+      var countInput = document.getElementById('count');
+      var giftSelect = document.getElementById('gift-select');
+      var btnSend = document.getElementById('btn-send');
+      var logEl = document.getElementById('log');
+      var giftButtons = document.getElementById('gift-buttons');
+      var sfxPresetSel = document.getElementById('cfg-sfx-preset');
+      var sfxVol = document.getElementById('cfg-sfx-vol');
+      var sfxVolVal = document.getElementById('cfg-sfx-vol-val');
+      var musicVol = document.getElementById('cfg-music-vol');
+      var musicVolVal = document.getElementById('cfg-music-vol-val');
+      var btnStartMusic = document.getElementById('btn-start-music');
+
+      var giftList = [];
+
+      function applyGiftsConfig(gifts) {
+        if (!gifts || !gifts.length) return;
+        giftList = gifts;
+        renderGiftButtons();
+        updateGiftSelect();
+      }
+
+      function renderGiftButtons() {
+        giftButtons.innerHTML = '';
+        giftList.forEach(function (g) {
+          var btn = document.createElement('button');
+          btn.type = 'button';
+          btn.textContent = (g.emoji || '') + ' ' + (g.id || '');
+          btn.className = 'gift-' + (g.team || '');
+          btn.onclick = function () { sendGift(g.id); };
+          giftButtons.appendChild(btn);
+        });
+      }
+
+      function updateGiftSelect() {
+        giftSelect.innerHTML = '';
+        var opt0 = document.createElement('option');
+        opt0.value = '';
+        opt0.textContent = '— Elegir regalo —';
+        giftSelect.appendChild(opt0);
+        giftList.forEach(function (g) {
+          var opt = document.createElement('option');
+          opt.value = g.id;
+          opt.textContent = (g.emoji || '') + ' ' + (g.id || '') + ' — ' + (g.label || g.command);
+          giftSelect.appendChild(opt);
+        });
+      }
+
+      function setStatus(connected) {
+        statusDot.className = 'status ' + (connected ? 'connected' : 'disconnected');
+      }
+
+      function log(msg) {
+        var line = document.createElement('div');
+        line.textContent = new Date().toLocaleTimeString() + ' — ' + msg;
+        logEl.insertBefore(line, logEl.firstChild);
+      }
+
+      function sendGift(giftId) {
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+          log('No conectado. ¿Está el Control Server corriendo? (npm start)');
+          return;
+        }
+        var user = (usernameInput.value || 'Anon').trim();
+        var count = parseInt(countInput.value, 10) || 1;
+        var payload = {
+          event: {
+            type: 'gift',
+            id: giftId,
+            name: giftId,
+            count: count,
+            user: user
+          }
+        };
+        ws.send(JSON.stringify(payload));
+        log(user + ' envió ' + count + 'x ' + giftId);
+      }
+
+      function sendConfig(config) {
+        if (!ws || ws.readyState !== WebSocket.OPEN) {
+          log('No conectado. No puedo enviar config.');
+          return;
+        }
+        ws.send(JSON.stringify({ type: 'config', config: config }));
+      }
+
+      function applyConfigFromUI() {
+        var preset = (sfxPresetSel.value || 'clean');
+        var sfxV = parseFloat(sfxVol.value);
+        var musV = parseFloat(musicVol.value);
+        sfxVolVal.textContent = isFinite(sfxV) ? sfxV.toFixed(1) : '—';
+        musicVolVal.textContent = isFinite(musV) ? musV.toFixed(2) : '—';
+        try {
+          localStorage.setItem('arcade_sim_cfg', JSON.stringify({ preset: preset, sfxV: sfxV, musV: musV }));
+        } catch (e) {}
+        sendConfig({ sfxPreset: preset, sfxVolume: sfxV, bgMusicVolume: musV });
+        log('Config aplicada: preset=' + preset + ' | sfx=' + sfxV.toFixed(1) + ' | music=' + musV.toFixed(2));
+      }
+
+      function connect() {
+        if (ws && ws.readyState === WebSocket.OPEN) return;
+        setStatus(false);
+        try {
+          ws = new WebSocket(WS_URL);
+          ws.onopen = function () {
+            setStatus(true);
+            log('Conectado al Control Server');
+            setTimeout(applyConfigFromUI, 150);
+          };
+          ws.onmessage = function (ev) {
+            try {
+              var msg = JSON.parse(ev.data);
+              if (msg.type === 'giftsConfig' && msg.gifts) applyGiftsConfig(msg.gifts);
+            } catch (e) {}
+          };
+          ws.onclose = function () {
+            setStatus(false);
+            log('Desconectado. Reintento en 3s...');
+            setTimeout(connect, 3000);
+          };
+          ws.onerror = function () { setStatus(false); };
+        } catch (e) {
+          log('Error: ' + e.message);
+          setTimeout(connect, 3000);
+        }
+      }
+
+      // Botones y select se rellenan al recibir giftsConfig del servidor
+
+      btnSend.addEventListener('click', function () {
+        sendGift(giftSelect.value);
+      });
+
+      // Cargar config guardada (si existe)
+      (function loadCfg() {
+        try {
+          var raw = localStorage.getItem('arcade_sim_cfg');
+          if (!raw) return;
+          var cfg = JSON.parse(raw);
+          if (cfg.preset) sfxPresetSel.value = cfg.preset;
+          if (typeof cfg.sfxV === 'number') sfxVol.value = String(cfg.sfxV);
+          if (typeof cfg.musV === 'number') musicVol.value = String(cfg.musV);
+          sfxVolVal.textContent = parseFloat(sfxVol.value).toFixed(1);
+          musicVolVal.textContent = parseFloat(musicVol.value).toFixed(2);
+        } catch (e) {}
+      })();
+
+      sfxPresetSel.addEventListener('change', applyConfigFromUI);
+      sfxVol.addEventListener('input', applyConfigFromUI);
+      musicVol.addEventListener('input', applyConfigFromUI);
+      btnStartMusic.addEventListener('click', function () {
+        sendConfig({ startBgMusic: true });
+        log('Reintentando iniciar música…');
+      });
+
+      connect();
+    })();
+  </script>
+</body>
+</html>

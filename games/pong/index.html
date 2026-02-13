@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Arcade Bot — Pong</title>
+  <link rel="stylesheet" href="../shared/styles.css" />
+</head>
+<body>
+  <div id="root">
+    <canvas id="game-canvas"></canvas>
+    <div class="live-pill">● LIVE</div>
+
+    <div id="overlay-root">
+      <div class="ingame-overlay">
+        <div class="ingame-panel"><span class="ingame-label">SCORE</span><span id="ingame-score">0</span></div>
+        <div class="ingame-panel"><span class="ingame-label">RÉCORD</span><span id="ingame-record">0</span></div>
+        <div class="ingame-panel"><span class="ingame-label">DONADOR</span><span id="ingame-donor">—</span></div>
+
+        <div class="ingame-panel ingame-combo" id="combo-panel" style="display:none;">
+          <span class="ingame-label">COMBO</span>
+          <span id="combo-value">x1</span>
+        </div>
+
+        <div class="war-bar-container" id="war-container">
+          <div class="war-label-row">
+            <span class="war-team war-help">🛡 HELP <span id="war-help-count">0</span></span>
+            <span class="war-vs">VS</span>
+            <span class="war-team war-destroy">💀 DESTROY <span id="war-destroy-count">0</span></span>
+          </div>
+          <div class="war-bar">
+            <div class="war-bar-fill war-bar-help" id="war-bar-help" style="width:50%"></div>
+            <div class="war-bar-fill war-bar-destroy" id="war-bar-destroy" style="width:50%"></div>
+          </div>
+        </div>
+
+        <div class="ingame-panel ingame-top-donors">
+          <span class="ingame-label">TOP 5 DONADORES (SESIÓN)</span>
+          <ul id="ingame-top5" class="ingame-top5-list"></ul>
+        </div>
+        <div class="ingame-panel ingame-king">
+          <span class="ingame-label">REY DONADOR (HISTORIA)</span>
+          <span id="ingame-king-name">—</span>
+          <span id="ingame-king-count" class="ingame-king-count"></span>
+        </div>
+
+        <div class="ingame-alert" id="ingame-alert"></div>
+        <div class="combo-popup" id="combo-popup"></div>
+      </div>
+    </div>
+
+    <div id="cta-bar">
+      <div id="cta-content"></div>
+    </div>
+
+    <div id="speed-overlay"></div>
+    <div id="speed-text">⚡ ¡VELOCIDAD!</div>
+
+    <div id="death-flash"></div>
+    <div id="shake-container"></div>
+
+    <div id="countdown-overlay">
+      <span id="countdown-number"></span>
+    </div>
+
+    <div id="newrecord-overlay">
+      <span class="newrecord-title">¡NUEVO RÉCORD!</span>
+      <span id="newrecord-score"></span>
+    </div>
+  </div>
+  <script src="../shared/audio.js"></script>
+  <script src="engine.js"></script>
+  <script src="bot.js"></script>
+  <script src="../shared/main.js"></script>
+</body>
+</html>

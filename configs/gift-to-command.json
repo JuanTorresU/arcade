@@ -1,0 +1,14 @@
+{
+  "Rose": "SPEED_UP",
+  "Ice Cream Cone": "SPAWN_FRUITS",
+  "GG": "BONUS_POINTS",
+  "Finger Heart": "SHIELD",
+  "Bomb": "NUKE",
+  "Dragon": "CHAOS",
+  "TikTok": "SHIELD",
+  "Perfume": "SPAWN_FRUITS",
+  "Doughnut": "BONUS_POINTS",
+  "Lion": "BONUS_POINTS",
+  "Universe": "MEGA_SHIELD",
+  "Interstellar": "MEGA_BONUS"
+}

@@ -1,0 +1,22 @@
+{
+  "name": "arcade-bot-network",
+  "version": "0.1.0",
+  "description": "Sistema autónomo de micro-juegos arcade conectados a TikTok Live",
+  "private": true,
+  "scripts": {
+    "start": "node control/server.js",
+    "start:game": "node scripts/serve-game.js",
+    "start:all": "concurrently \"npm run start\" \"npm run start:game\"",
+    "listener": "python3 listener/tiktok_listener.py",
+    "start:simulator": "node scripts/serve-simulator.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "concurrently": "^9.1.0"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}

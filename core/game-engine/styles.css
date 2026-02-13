@@ -1,0 +1,570 @@
+/* Arcade Bot — Snake — Estilo TikTok: neón, gradientes, impacto visual */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@600;700;800&display=swap');
+
+:root {
+  --bg-dark: #0d0d14;
+  --accent: #00ffb4;
+  --accent-pink: #ff2d92;
+  --accent-purple: #b24bf3;
+  --accent-cyan: #00e5ff;
+  --gold: #ffd700;
+  --font: 'Outfit', system-ui, sans-serif;
+}
+
+* {
+  margin: 0;
+  padding: 0;
+  box-sizing: border-box;
+}
+
+html, body {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg-dark);
+  font-family: var(--font);
+  color: #fff;
+}
+
+body {
+  background: linear-gradient(135deg, #0d0d14 0%, #1a0a2e 40%, #0d1a1a 70%, #0d0d14 100%);
+  background-size: 400% 400%;
+  animation: bgShift 15s ease infinite;
+}
+
+@keyframes bgShift {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+#root {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+#game-canvas {
+  display: block;
+  border-radius: 16px;
+  border: 3px solid transparent;
+  background: linear-gradient(var(--bg-dark), var(--bg-dark)) padding-box,
+              linear-gradient(135deg, var(--accent), var(--accent-pink), var(--accent-purple), var(--accent)) border-box;
+  background-clip: padding-box, border-box;
+  background-origin: padding-box, border-box;
+  box-shadow: 0 0 40px rgba(0, 255, 180, 0.3),
+              0 0 80px rgba(255, 45, 146, 0.15),
+              inset 0 0 60px rgba(0, 255, 180, 0.03);
+  animation: canvasGlow 3s ease-in-out infinite alternate;
+  image-rendering: pixelated;
+  image-rendering: crisp-edges;
+}
+
+@keyframes canvasGlow {
+  from { box-shadow: 0 0 30px rgba(0, 255, 180, 0.25), 0 0 60px rgba(255, 45, 146, 0.1), inset 0 0 40px rgba(0, 255, 180, 0.02); }
+  to   { box-shadow: 0 0 50px rgba(0, 255, 180, 0.4), 0 0 100px rgba(255, 45, 146, 0.2), inset 0 0 80px rgba(0, 255, 180, 0.05); }
+}
+
+#death-flash {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(ellipse at center, transparent 30%, rgba(255, 45, 146, 0.6) 100%);
+  opacity: 0;
+  transition: opacity 0.12s ease-out;
+  z-index: 100;
+}
+
+#death-flash.active {
+  opacity: 1;
+  animation: flash 0.5s ease-out forwards;
+}
+
+@keyframes flash {
+  to { opacity: 0; }
+}
+
+#shake-container {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 50;
+}
+
+#shake-container.shake {
+  animation: shake 0.4s cubic-bezier(0.36, 0.07, 0.19, 0.97) both;
+}
+
+@keyframes shake {
+  10%, 90% { transform: translate(-3px, 0); }
+  20%, 80% { transform: translate(3px, 0); }
+  30%, 70% { transform: translate(-3px, 0); }
+  40%, 60% { transform: translate(3px, 0); }
+  50% { transform: translate(0, 0); }
+}
+
+/* ——— Overlay ——— */
+#overlay-root {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 10;
+}
+
+.ingame-overlay {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 14px;
+  align-content: flex-start;
+}
+
+.ingame-panel {
+  background: linear-gradient(135deg, rgba(20, 20, 35, 0.92) 0%, rgba(30, 15, 45, 0.88) 100%);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-left: 4px solid var(--accent);
+  border-radius: 12px;
+  padding: 10px 14px;
+  min-width: 95px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4), 0 0 20px rgba(0, 255, 180, 0.08);
+}
+
+.ingame-label {
+  display: block;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.12em;
+  color: rgba(255, 255, 255, 0.7);
+  margin-bottom: 2px;
+}
+
+.ingame-panel span:last-child {
+  font-size: 20px;
+  font-weight: 800;
+  background: linear-gradient(135deg, #fff 0%, var(--accent) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+  text-shadow: 0 0 20px rgba(0, 255, 180, 0.3);
+}
+
+.ingame-panel.ingame-top-donors { min-width: 150px; border-left-color: var(--accent-purple); }
+.ingame-panel.ingame-king { border-left-color: var(--gold); }
+
+.ingame-top5-list {
+  list-style: none;
+  font-size: 13px;
+  font-weight: 700;
+  margin-top: 6px;
+}
+.ingame-top5-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 4px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  color: rgba(255, 255, 255, 0.95);
+}
+.ingame-top5-list li:last-child { border-bottom: none; }
+.ingame-top5-list .ingame-rank {
+  color: var(--accent);
+  opacity: 0.95;
+}
+
+.ingame-king #ingame-king-name {
+  display: block;
+  font-size: 16px;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--gold) 0%, #fff 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+.ingame-king-count {
+  font-size: 12px;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+/* Alert de regalo — impacto TikTok (por encima del CTA) */
+.ingame-alert {
+  position: fixed;
+  bottom: 95px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: linear-gradient(135deg, rgba(255, 45, 146, 0.95) 0%, rgba(178, 75, 243, 0.95) 100%);
+  color: #fff;
+  padding: 14px 28px;
+  border-radius: 999px;
+  font-size: 15px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  opacity: 0;
+  transition: opacity 0.2s, transform 0.2s;
+  box-shadow: 0 0 40px rgba(255, 45, 146, 0.5), 0 4px 20px rgba(0, 0, 0, 0.3);
+  border: 2px solid rgba(255, 255, 255, 0.3);
+}
+
+.ingame-alert.show {
+  opacity: 1;
+  animation: alertPop 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes alertPop {
+  0%   { transform: translateX(-50%) scale(0.8); opacity: 0; }
+  70%  { transform: translateX(-50%) scale(1.05); }
+  100% { transform: translateX(-50%) scale(1); opacity: 1; }
+}
+
+/* Pill LIVE opcional (puedes añadir en HTML si quieres) */
+.live-pill {
+  position: fixed;
+  top: 14px;
+  left: 14px;
+  z-index: 20;
+  background: linear-gradient(135deg, var(--accent-pink), var(--accent-purple));
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+  padding: 6px 12px;
+  border-radius: 999px;
+  letter-spacing: 0.1em;
+  box-shadow: 0 0 20px rgba(255, 45, 146, 0.5);
+  animation: livePulse 2s ease-in-out infinite;
+}
+@keyframes livePulse {
+  0%, 100% { opacity: 1; box-shadow: 0 0 20px rgba(255, 45, 146, 0.5); }
+  50%      { opacity: 0.9; box-shadow: 0 0 30px rgba(255, 45, 146, 0.7); }
+}
+
+/* ═══════════════════════════════════════
+   CALL-TO-ACTION FIJO
+   ═══════════════════════════════════════ */
+
+#cta-bar {
+  position: fixed;
+  bottom: 18px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 15;
+  pointer-events: none;
+  width: 92%;
+  max-width: 560px;
+}
+
+#cta-content {
+  background: linear-gradient(135deg, rgba(15, 15, 30, 0.88) 0%, rgba(25, 10, 40, 0.85) 100%);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 14px;
+  padding: 10px 14px;
+  box-shadow: 0 4px 30px rgba(0, 0, 0, 0.4), 0 0 20px rgba(0, 255, 180, 0.06);
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.cta-row {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+
+.cta-item {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.cta-item.cta-destroy {
+  color: var(--accent-pink);
+}
+
+.cta-item.cta-help {
+  color: var(--accent);
+}
+
+/* ═══════════════════════════════════════
+   Efecto rojo — al subir velocidad (regalo Rose)
+   ═══════════════════════════════════════ */
+
+#speed-overlay {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 90;
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+#speed-overlay.show {
+  opacity: 1;
+  border: 5px solid rgba(255, 40, 40, 0.7);
+  background: radial-gradient(ellipse at center, transparent 35%, rgba(255, 0, 0, 0.2) 100%);
+  animation: speedPulse 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes speedPulse {
+  0%, 100% { border-color: rgba(255, 40, 40, 0.5); box-shadow: inset 0 0 80px rgba(255, 0, 0, 0.12); }
+  50%      { border-color: rgba(255, 40, 40, 0.9); box-shadow: inset 0 0 120px rgba(255, 0, 0, 0.25); }
+}
+
+#speed-text {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 91;
+  font-size: 32px;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 0 30px rgba(255, 40, 40, 0.9), 0 0 60px rgba(255, 40, 40, 0.5);
+  letter-spacing: 0.05em;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.25s ease;
+  text-align: center;
+  white-space: nowrap;
+}
+
+#speed-text.show {
+  opacity: 1;
+  animation: speedTextPulse 0.5s ease-in-out infinite alternate;
+}
+
+@keyframes speedTextPulse {
+  from { transform: translate(-50%, -50%) scale(1); }
+  to   { transform: translate(-50%, -50%) scale(1.06); }
+}
+
+#game-canvas.speed-glow {
+  border-color: rgba(255, 40, 40, 0.8) !important;
+  box-shadow: 0 0 50px rgba(255, 40, 40, 0.5), 0 0 100px rgba(255, 40, 40, 0.25), inset 0 0 60px rgba(255, 40, 40, 0.06) !important;
+  animation: speedCanvasGlow 0.5s ease-in-out infinite alternate !important;
+}
+
+@keyframes speedCanvasGlow {
+  from { box-shadow: 0 0 40px rgba(255, 40, 40, 0.4), 0 0 80px rgba(255, 40, 40, 0.2); }
+  to   { box-shadow: 0 0 60px rgba(255, 40, 40, 0.7), 0 0 120px rgba(255, 40, 40, 0.35); }
+}
+
+/* ═══════════════════════════════════════
+   FEATURE 2 — DONOR WAR: HELP vs DESTROY
+   ═══════════════════════════════════════ */
+
+.war-bar-container {
+  width: 100%;
+  max-width: 340px;
+  padding: 8px 14px 10px;
+  background: linear-gradient(135deg, rgba(20, 20, 35, 0.92) 0%, rgba(30, 15, 45, 0.88) 100%);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 12px;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.4);
+}
+
+.war-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.war-team { display: flex; align-items: center; gap: 4px; }
+.war-help { color: var(--accent); }
+.war-destroy { color: var(--accent-pink); }
+.war-vs {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.5);
+  letter-spacing: 0.15em;
+}
+
+.war-bar {
+  display: flex;
+  height: 10px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.war-bar-fill {
+  height: 100%;
+  transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.war-bar-help {
+  background: linear-gradient(90deg, var(--accent), #00e5ff);
+  box-shadow: 0 0 12px rgba(0, 255, 180, 0.5);
+}
+
+.war-bar-destroy {
+  background: linear-gradient(90deg, var(--accent-pink), var(--accent-purple));
+  box-shadow: 0 0 12px rgba(255, 45, 146, 0.5);
+}
+
+/* ═══════════════════════════════════════
+   FEATURE 3 — COMBOS Y MULTIPLICADORES
+   ═══════════════════════════════════════ */
+
+/* Panel de combo en el overlay */
+.ingame-combo {
+  border-left-color: var(--accent-cyan) !important;
+  transition: transform 0.15s ease;
+}
+
+.ingame-combo.active {
+  animation: comboPanelPop 0.3s ease;
+}
+
+@keyframes comboPanelPop {
+  0%   { transform: scale(1); }
+  50%  { transform: scale(1.15); }
+  100% { transform: scale(1); }
+}
+
+.ingame-combo #combo-value {
+  font-size: 26px;
+  font-weight: 800;
+  background: linear-gradient(135deg, var(--accent-cyan) 0%, var(--accent) 50%, var(--gold) 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+/* Popup central de combo grande */
+.combo-popup {
+  position: fixed;
+  top: 30%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 95;
+  font-size: 60px;
+  font-weight: 800;
+  color: #fff;
+  opacity: 0;
+  pointer-events: none;
+  text-align: center;
+  text-shadow: 0 0 40px rgba(0, 229, 255, 0.8), 0 0 80px rgba(0, 229, 255, 0.4);
+}
+
+.combo-popup.show {
+  animation: comboPopupAnim 1.2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes comboPopupAnim {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.3); }
+  20%  { opacity: 1; transform: translate(-50%, -50%) scale(1.3); }
+  40%  { transform: translate(-50%, -50%) scale(1); }
+  80%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -60%) scale(1.1); }
+}
+
+/* Colores de combo según nivel */
+.combo-popup.combo-2 { color: var(--accent-cyan); text-shadow: 0 0 40px rgba(0, 229, 255, 0.8); }
+.combo-popup.combo-3 { color: var(--accent); text-shadow: 0 0 40px rgba(0, 255, 180, 0.8); }
+.combo-popup.combo-5 { color: var(--accent-pink); text-shadow: 0 0 40px rgba(255, 45, 146, 0.8); }
+.combo-popup.combo-mega {
+  color: var(--gold);
+  text-shadow: 0 0 50px rgba(255, 215, 0, 0.9), 0 0 100px rgba(255, 215, 0, 0.5);
+  font-size: 72px;
+}
+
+/* ── Cuenta atrás 3-2-1 ── */
+#countdown-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 98;
+  pointer-events: none;
+  opacity: 0;
+  background: radial-gradient(ellipse at center, transparent 40%, rgba(0, 0, 0, 0.5) 100%);
+}
+
+#countdown-overlay.show {
+  opacity: 1;
+  transition: opacity 0.2s ease;
+}
+
+#countdown-number {
+  font-size: 120px;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 0 60px var(--accent), 0 0 120px var(--accent-pink);
+  animation: countdownPop 0.9s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+@keyframes countdownPop {
+  0%   { transform: scale(0.2); opacity: 0; }
+  40%  { transform: scale(1.2); opacity: 1; }
+  70%  { transform: scale(1); }
+  100% { transform: scale(1); opacity: 1; }
+}
+
+/* ── Celebración nuevo récord ── */
+#newrecord-overlay {
+  position: fixed;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 99;
+  pointer-events: none;
+  text-align: center;
+  opacity: 0;
+}
+
+#newrecord-overlay.show {
+  animation: newRecordAnim 2s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.newrecord-title {
+  display: block;
+  font-size: 42px;
+  font-weight: 800;
+  color: var(--gold);
+  text-shadow: 0 0 30px var(--gold), 0 0 60px rgba(255, 215, 0, 0.6);
+  letter-spacing: 0.05em;
+}
+
+#newrecord-score {
+  display: block;
+  font-size: 72px;
+  font-weight: 800;
+  color: #fff;
+  text-shadow: 0 0 40px var(--accent), 0 0 80px var(--accent-pink);
+  margin-top: 8px;
+}
+
+@keyframes newRecordAnim {
+  0%   { opacity: 0; transform: translate(-50%, -50%) scale(0.5); }
+  15%  { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+  30%  { transform: translate(-50%, -50%) scale(1); }
+  80%  { opacity: 1; }
+  100% { opacity: 0; transform: translate(-50%, -55%) scale(1.05); }
+}
+
+/* Micro-shake al comer */
+#shake-container.shake-eat {
+  animation: shakeEat 0.15s ease-out both;
+}
+
+@keyframes shakeEat {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(-1px, -1px); }
+  75% { transform: translate(1px, 1px); }
+}

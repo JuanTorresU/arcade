@@ -1,0 +1,215 @@
+/* Overlay — Score, donadores, alertas, war bar, combo, CTA */
+:root {
+  --overlay-bg: rgba(10, 10, 18, 0.85);
+  --accent: #00ffb4;
+  --accent-pink: #ff2d92;
+  --accent-purple: #b24bf3;
+  --accent-cyan: #00e5ff;
+  --gold: #ffd700;
+  --danger: #ff3366;
+  --font-mono: "JetBrains Mono", "Fira Code", monospace;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: var(--font-mono);
+  background: transparent;
+  color: var(--accent);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+#overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 16px;
+  align-content: flex-start;
+  align-items: flex-start;
+}
+
+.panel {
+  background: var(--overlay-bg);
+  border: 1px solid rgba(0, 255, 180, 0.25);
+  border-radius: 8px;
+  padding: 10px 14px;
+  min-width: 120px;
+  box-shadow: 0 0 20px rgba(0, 255, 180, 0.1);
+}
+
+.panel .label {
+  display: block;
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.8;
+  margin-bottom: 4px;
+}
+
+.panel span:last-child {
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.score-panel { border-left: 3px solid var(--accent); }
+.record-panel { border-left: 3px solid var(--gold); }
+.last-donor { border-left: 3px solid #a78bfa; }
+
+/* ── Combo panel ── */
+.combo-panel {
+  border-left: 3px solid var(--accent-cyan);
+}
+
+.combo-panel #combo-value {
+  font-size: 22px;
+  font-weight: 800;
+  color: var(--accent-cyan);
+}
+
+/* ── Donor War ── */
+.war-panel {
+  min-width: 200px;
+  border-left: 3px solid var(--accent-purple);
+}
+
+.war-label-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+  font-size: 11px;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.war-team { display: flex; align-items: center; gap: 4px; }
+.war-help { color: var(--accent); }
+.war-destroy { color: var(--accent-pink); }
+.war-vs {
+  font-size: 10px;
+  color: rgba(255, 255, 255, 0.5);
+  letter-spacing: 0.15em;
+}
+
+.war-bar {
+  display: flex;
+  height: 8px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.war-bar-fill {
+  height: 100%;
+  transition: width 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.war-bar-help {
+  background: linear-gradient(90deg, var(--accent), var(--accent-cyan));
+  box-shadow: 0 0 10px rgba(0, 255, 180, 0.4);
+}
+
+.war-bar-destroy {
+  background: linear-gradient(90deg, var(--accent-pink), var(--accent-purple));
+  box-shadow: 0 0 10px rgba(255, 45, 146, 0.4);
+}
+
+/* ── Alert (por encima del CTA, con espacio) ── */
+.panel.alert {
+  position: fixed;
+  bottom: 105px;
+  left: 50%;
+  transform: translateX(-50%);
+  min-width: 280px;
+  text-align: center;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  background: linear-gradient(135deg, rgba(255, 45, 146, 0.9) 0%, rgba(178, 75, 243, 0.9) 100%);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 999px;
+  padding: 12px 24px;
+}
+
+.panel.alert.show {
+  opacity: 1;
+  animation: pulse 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+@keyframes pulse {
+  0%   { transform: translateX(-50%) scale(0.8); opacity: 0; }
+  70%  { transform: translateX(-50%) scale(1.05); }
+  100% { transform: translateX(-50%) scale(1); opacity: 1; }
+}
+
+#alert-text {
+  font-size: 14px;
+  font-weight: 700;
+}
+
+/* ── Top 5 donadores ── */
+.top-donors-panel { min-width: 140px; }
+.top5-list {
+  list-style: none;
+  font-size: 12px;
+  font-weight: 600;
+  margin-top: 4px;
+}
+.top5-list li {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 2px 0;
+  border-bottom: 1px solid rgba(0, 255, 180, 0.2);
+}
+.top5-list li:last-child { border-bottom: none; }
+.top5-list .rank { opacity: 0.8; }
+
+/* ── Rey donador ── */
+.king-panel { border-left: 3px solid var(--gold); }
+.king-panel #king-name { display: block; font-size: 16px; color: var(--gold); }
+.king-count { font-size: 11px; opacity: 0.9; }
+
+/* ── CTA fijo (descripción de regalos, separado de la alerta) ── */
+#cta-bar {
+  position: fixed;
+  bottom: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 90%;
+  max-width: 520px;
+  background: var(--overlay-bg);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 12px;
+  padding: 8px 14px;
+}
+
+#cta-content {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.cta-row {
+  display: flex;
+  justify-content: center;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}
+
+.cta-item {
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+}
+
+.cta-item.cta-destroy { color: var(--accent-pink); }
+.cta-item.cta-help { color: var(--accent); }

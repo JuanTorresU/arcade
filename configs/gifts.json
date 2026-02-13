@@ -1,0 +1,138 @@
+{
+  "gifts": [
+    {
+      "id": "Rose",
+      "emoji": "🌹",
+      "command": "SPEED_UP",
+      "team": "destroy",
+      "label": "Velocidad",
+      "tier": 1,
+      "coins": 1
+    },
+    {
+      "id": "Ice Cream Cone",
+      "emoji": "🍦",
+      "command": "SPAWN_FRUITS",
+      "team": "help",
+      "label": "+5 Frutas",
+      "tier": 1,
+      "coins": 1
+    },
+    {
+      "id": "GG",
+      "emoji": "🎮",
+      "command": "BONUS_POINTS",
+      "team": "help",
+      "label": "+50 pts",
+      "tier": 1,
+      "coins": 1
+    },
+    {
+      "id": "Finger Heart",
+      "emoji": "🫰",
+      "command": "SHIELD",
+      "team": "help",
+      "label": "Mini Shield",
+      "tier": 1,
+      "coins": 5
+    },
+    {
+      "id": "TikTok",
+      "emoji": "🛡",
+      "command": "SHIELD",
+      "team": "help",
+      "label": "Shield 3s",
+      "tier": 2,
+      "coins": 10
+    },
+    {
+      "id": "Perfume",
+      "emoji": "💐",
+      "command": "SPAWN_FRUITS",
+      "team": "help",
+      "label": "+20 Frutas",
+      "tier": 2,
+      "coins": 20
+    },
+    {
+      "id": "Doughnut",
+      "emoji": "🍩",
+      "command": "BONUS_POINTS",
+      "team": "help",
+      "label": "+200 pts",
+      "tier": 2,
+      "coins": 30
+    },
+    {
+      "id": "Bomb",
+      "emoji": "💣",
+      "command": "NUKE",
+      "team": "destroy",
+      "label": "Nuke",
+      "tier": 2,
+      "coins": 20
+    },
+    {
+      "id": "Dragon",
+      "emoji": "🐉",
+      "command": "CHAOS",
+      "team": "destroy",
+      "label": "Caos 8s",
+      "tier": 2,
+      "coins": 50
+    },
+    {
+      "id": "Lion",
+      "emoji": "🦁",
+      "command": "BONUS_POINTS",
+      "team": "help",
+      "label": "+500 pts",
+      "tier": 3,
+      "coins": 100
+    },
+    {
+      "id": "Universe",
+      "emoji": "🌌",
+      "command": "MEGA_SHIELD",
+      "team": "help",
+      "label": "Mega Shield 10s",
+      "tier": 3,
+      "coins": 500
+    },
+    {
+      "id": "Interstellar",
+      "emoji": "🚀",
+      "command": "MEGA_BONUS",
+      "team": "help",
+      "label": "+2000 pts",
+      "tier": 3,
+      "coins": 1000
+    }
+  ],
+  "goals": [
+    {
+      "id": "goal-1",
+      "target": 10,
+      "label": "🎯 10 Regalos = ¡Lluvia de Frutas!",
+      "reward": "RAIN_FRUITS"
+    },
+    {
+      "id": "goal-2",
+      "target": 30,
+      "label": "🔥 30 Regalos = ¡Modo Invencible 15s!",
+      "reward": "INVINCIBLE"
+    },
+    {
+      "id": "goal-3",
+      "target": 60,
+      "label": "💎 60 Regalos = ¡Score x2 por 30s!",
+      "reward": "DOUBLE_SCORE"
+    },
+    {
+      "id": "goal-4",
+      "target": 100,
+      "label": "⚡ 100 Regalos = ¡SUPER EVENTO!",
+      "reward": "SUPER_EVENT"
+    }
+  ]
+}

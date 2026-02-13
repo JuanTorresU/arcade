@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Arcade Bot — Snake</title>
+  <link rel="stylesheet" href="../shared/styles.css" />
+</head>
+<body>
+  <div id="root">
+    <!-- Layout: izquierda=paneles, centro=juego, derecha=donantes -->
+    <div id="layout">
+
+      <!-- COLUMNA IZQUIERDA: stats + war -->
+      <div id="col-left">
+        <div class="ingame-panel"><span class="ingame-label">SCORE</span><span id="ingame-score">0</span></div>
+        <div class="ingame-panel"><span class="ingame-label">RÉCORD</span><span id="ingame-record">0</span></div>
+        <!-- Bot stats (Hamilton): longitud, % tablero, movimientos, modo -->
+        <div class="ingame-panel" id="bot-stats-panel">
+          <span class="ingame-label">LONG</span><span id="bot-length">0</span>
+          <span class="ingame-label">% TABLERO</span><span id="bot-fill">0</span>%
+          <span class="ingame-label">MOV</span><span id="bot-moves">0</span>
+          <span class="ingame-label" id="bot-mode-label">Atajos</span>
+        </div>
+        <div class="ingame-panel"><span class="ingame-label">DONADOR</span><span id="ingame-donor">—</span></div>
+        <div class="ingame-panel ingame-combo" id="combo-panel" style="display:none;">
+          <span class="ingame-label">COMBO</span>
+          <span id="combo-value">x1</span>
+        </div>
+
+        <!-- Goal / Meta -->
+        <div class="ingame-panel ingame-goal" id="goal-panel" style="display:none;">
+          <span class="ingame-label">META</span>
+          <span id="goal-text">—</span>
+          <div class="goal-bar"><div class="goal-bar-fill" id="goal-bar-fill"></div></div>
+          <span id="goal-progress" class="goal-progress">0 / 0</span>
+        </div>
+
+        <!-- War bar -->
+        <div class="war-bar-container" id="war-container">
+          <div class="war-label-row">
+            <span class="war-team war-help">🛡 HELP <span id="war-help-count">0</span></span>
+            <span class="war-vs">VS</span>
+            <span class="war-team war-destroy">💀 DESTROY <span id="war-destroy-count">0</span></span>
+          </div>
+          <div class="war-bar">
+            <div class="war-bar-fill war-bar-help" id="war-bar-help" style="width:50%"></div>
+            <div class="war-bar-fill war-bar-destroy" id="war-bar-destroy" style="width:50%"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- CENTRO: juego -->
+      <div id="col-center">
+        <div class="live-pill">● LIVE</div>
+        <canvas id="game-canvas"></canvas>
+      </div>
+
+      <!-- COLUMNA DERECHA: donantes -->
+      <div id="col-right">
+        <div class="ingame-panel ingame-top-donors">
+          <span class="ingame-label">🏆 TOP 5 DONADORES</span>
+          <ul id="ingame-top5" class="ingame-top5-list"></ul>
+        </div>
+        <div class="ingame-panel ingame-king">
+          <span class="ingame-label">👑 REY DONADOR</span>
+          <span id="ingame-king-name">—</span>
+          <span id="ingame-king-count" class="ingame-king-count"></span>
+        </div>
+      </div>
+    </div>
+
+    <!-- OVERLAYS GLOBALES (encima de todo) -->
+    <div id="gift-anim-container"></div>
+    <div class="ingame-alert" id="ingame-alert"></div>
+    <div class="combo-popup" id="combo-popup"></div>
+    <div id="milestone-popup" class="milestone-popup"></div>
+
+    <div id="cta-bar">
+      <div id="cta-content"></div>
+    </div>
+
+    <div id="speed-overlay"></div>
+    <div id="speed-text">⚡ ¡VELOCIDAD!</div>
+    <div id="death-flash"></div>
+    <div id="shake-container"></div>
+
+    <div id="countdown-overlay">
+      <span id="countdown-number"></span>
+    </div>
+
+    <div id="newrecord-overlay">
+      <span class="newrecord-title">¡NUEVO RÉCORD!</span>
+      <span id="newrecord-score"></span>
+    </div>
+
+    <div id="war-result-overlay" class="war-result-overlay"></div>
+  </div>
+  <script src="../shared/audio.js"></script>
+  <script src="engine.js"></script>
+  <script src="bot.js"></script>
+  <script src="../shared/main.js"></script>
+</body>
+</html>

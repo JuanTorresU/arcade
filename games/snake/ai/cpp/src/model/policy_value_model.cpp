@@ -2,126 +2,143 @@
 
 #include <algorithm>
 #include <cmath>
-#include <cstdint>
-#include <fstream>
-#include <limits>
-#include <numeric>
-#include <random>
+#include <cstring>
+#include <filesystem>
+
+namespace fs = std::filesystem;
 
 namespace alphasnake {
-namespace {
 
-constexpr uint32_t kMagic = 0x314d5341U;  // ASM1
-constexpr float kBeta1 = 0.9f;
-constexpr float kBeta2 = 0.999f;
-constexpr float kEps = 1e-8f;
+ResidualBlockImpl::ResidualBlockImpl(int channels)
+    : conv1(torch::nn::Conv2dOptions(channels, channels, 3).padding(1).bias(false)),
+      bn1(channels),
+      conv2(torch::nn::Conv2dOptions(channels, channels, 3).padding(1).bias(false)),
+      bn2(channels) {
+  register_module("conv1", conv1);
+  register_module("bn1", bn1);
+  register_module("conv2", conv2);
+  register_module("bn2", bn2);
+}
 
-struct FileHeader {
-  uint32_t magic;
-  uint32_t version;
-  uint32_t board_size;
-  uint32_t input_dim;
-  uint64_t step;
-};
+torch::Tensor ResidualBlockImpl::forward(const torch::Tensor& x) {
+  auto y = torch::relu(bn1(conv1(x)));
+  y = bn2(conv2(y));
+  y = y + x;
+  return torch::relu(y);
+}
 
-template <typename T>
-void write_vec(std::ofstream& out, const std::vector<T>& v) {
-  const uint64_t n = static_cast<uint64_t>(v.size());
-  out.write(reinterpret_cast<const char*>(&n), sizeof(n));
-  if (!v.empty()) {
-    out.write(reinterpret_cast<const char*>(v.data()), static_cast<std::streamsize>(sizeof(T) * v.size()));
+AlphaSnakeNetImpl::AlphaSnakeNetImpl(int board_size, int channels, int blocks)
+    : board_size_(board_size),
+      channels_(channels),
+      stem_conv(torch::nn::Conv2dOptions(4, channels, 3).padding(1).bias(false)),
+      stem_bn(channels),
+      res_blocks(torch::nn::ModuleList()),
+      policy_conv(torch::nn::Conv2dOptions(channels, 2, 1).bias(false)),
+      policy_bn(2),
+      policy_fc(2 * board_size * board_size, 4),
+      value_conv(torch::nn::Conv2dOptions(channels, 1, 1).bias(false)),
+      value_bn(1),
+      value_fc1(board_size * board_size, 64),
+      value_fc2(64, 1) {
+  register_module("stem_conv", stem_conv);
+  register_module("stem_bn", stem_bn);
+
+  for (int i = 0; i < blocks; ++i) {
+    res_blocks->push_back(ResidualBlock(channels));
   }
+  register_module("res_blocks", res_blocks);
+
+  register_module("policy_conv", policy_conv);
+  register_module("policy_bn", policy_bn);
+  register_module("policy_fc", policy_fc);
+
+  register_module("value_conv", value_conv);
+  register_module("value_bn", value_bn);
+  register_module("value_fc1", value_fc1);
+  register_module("value_fc2", value_fc2);
 }
 
-template <typename T>
-bool read_vec(std::ifstream& in, std::vector<T>& v) {
-  uint64_t n = 0;
-  in.read(reinterpret_cast<char*>(&n), sizeof(n));
-  if (!in.good()) return false;
-  v.resize(static_cast<std::size_t>(n));
-  if (n > 0) {
-    in.read(reinterpret_cast<char*>(v.data()), static_cast<std::streamsize>(sizeof(T) * v.size()));
+std::pair<torch::Tensor, torch::Tensor> AlphaSnakeNetImpl::forward(torch::Tensor x) {
+  x = torch::relu(stem_bn(stem_conv(x)));
+
+  for (const auto& block : *res_blocks) {
+    x = block->as<ResidualBlock>()->forward(x);
   }
-  return in.good();
+
+  auto p = torch::relu(policy_bn(policy_conv(x)));
+  p = p.view({p.size(0), -1});
+  p = policy_fc(p);
+  p = torch::softmax(p, 1);
+
+  auto v = torch::relu(value_bn(value_conv(x)));
+  v = v.view({v.size(0), -1});
+  v = torch::relu(value_fc1(v));
+  v = torch::tanh(value_fc2(v));
+
+  return {p, v};
 }
 
-}  // namespace
-
-PolicyValueModel::PolicyValueModel(int board_size, uint32_t seed) {
-  init(board_size, seed);
+PolicyValueModel::PolicyValueModel(int board_size,
+                                   int channels,
+                                   int blocks,
+                                   uint32_t seed,
+                                   float lr,
+                                   float weight_decay) {
+  init(board_size, channels, blocks, seed, lr, weight_decay);
 }
 
-void PolicyValueModel::init(int board_size, uint32_t seed) {
+void PolicyValueModel::init(int board_size,
+                            int channels,
+                            int blocks,
+                            uint32_t seed,
+                            float lr,
+                            float weight_decay) {
   board_size_ = board_size;
+  channels_ = channels;
+  blocks_ = blocks;
   input_dim_ = 4 * board_size_ * board_size_;
-  step_ = 0;
 
-  wp_.assign(static_cast<std::size_t>(4 * input_dim_), 0.0f);
-  bp_.fill(0.0f);
-  wv_.assign(static_cast<std::size_t>(input_dim_), 0.0f);
-  bv_ = 0.0f;
-
-  m_wp_.assign(wp_.size(), 0.0f);
-  v_wp_.assign(wp_.size(), 0.0f);
-  m_bp_.fill(0.0f);
-  v_bp_.fill(0.0f);
-  m_wv_.assign(wv_.size(), 0.0f);
-  v_wv_.assign(wv_.size(), 0.0f);
-  m_bv_ = 0.0f;
-  v_bv_ = 0.0f;
-
-  std::mt19937 rng(seed);
-  std::normal_distribution<float> nd(0.0f, 0.02f);
-  for (auto& w : wp_) w = nd(rng);
-  for (auto& w : wv_) w = nd(rng);
-}
-
-std::array<float, 4> PolicyValueModel::logits(const std::vector<float>& state) const {
-  std::array<float, 4> out{0.0f, 0.0f, 0.0f, 0.0f};
-  for (int a = 0; a < 4; ++a) {
-    float z = bp_[static_cast<std::size_t>(a)];
-    const std::size_t base = static_cast<std::size_t>(a * input_dim_);
-    for (int i = 0; i < input_dim_; ++i) {
-      z += wp_[base + static_cast<std::size_t>(i)] * state[static_cast<std::size_t>(i)];
-    }
-    out[static_cast<std::size_t>(a)] = z;
+  torch::manual_seed(static_cast<int64_t>(seed));
+  if (torch::cuda::is_available()) {
+    device_ = torch::kCUDA;
+  } else {
+    device_ = torch::kCPU;
   }
-  return out;
-}
 
-std::array<float, 4> PolicyValueModel::softmax(const std::array<float, 4>& logits) {
-  float mx = logits[0];
-  for (int i = 1; i < 4; ++i) mx = std::max(mx, logits[static_cast<std::size_t>(i)]);
+  net_ = AlphaSnakeNet(board_size_, channels_, blocks_);
+  net_->to(device_);
 
-  std::array<float, 4> ex{0.0f, 0.0f, 0.0f, 0.0f};
-  float sum = 0.0f;
-  for (int i = 0; i < 4; ++i) {
-    ex[static_cast<std::size_t>(i)] = std::exp(logits[static_cast<std::size_t>(i)] - mx);
-    sum += ex[static_cast<std::size_t>(i)];
-  }
-  if (sum <= 0.0f) {
-    return {0.25f, 0.25f, 0.25f, 0.25f};
-  }
-  for (int i = 0; i < 4; ++i) {
-    ex[static_cast<std::size_t>(i)] /= sum;
-  }
-  return ex;
+  optimizer_ = std::make_unique<torch::optim::AdamW>(
+      net_->parameters(),
+      torch::optim::AdamWOptions(lr).weight_decay(weight_decay));
 }
 
 Prediction PolicyValueModel::predict(const std::vector<float>& state) const {
   Prediction pred;
-  if (static_cast<int>(state.size()) != input_dim_) {
+  if (static_cast<int>(state.size()) != input_dim_ || !net_) {
     return pred;
   }
 
-  std::array<float, 4> lg = logits(state);
-  pred.policy = softmax(lg);
+  std::lock_guard<std::mutex> lock(infer_mu_);
+  torch::NoGradGuard no_grad;
+  net_->eval();
 
-  float v = bv_;
-  for (int i = 0; i < input_dim_; ++i) {
-    v += wv_[static_cast<std::size_t>(i)] * state[static_cast<std::size_t>(i)];
+  auto t = torch::from_blob(
+               const_cast<float*>(state.data()),
+               {1, 4, board_size_, board_size_},
+               torch::TensorOptions().dtype(torch::kFloat32))
+               .clone()
+               .to(device_);
+
+  auto out = net_->forward(t);
+  auto p = out.first.to(torch::kCPU).contiguous();
+  auto v = out.second.to(torch::kCPU).contiguous();
+
+  const float* pptr = p.data_ptr<float>();
+  for (int i = 0; i < 4; ++i) {
+    pred.policy[static_cast<std::size_t>(i)] = pptr[i];
   }
-  pred.value = std::tanh(v);
+  pred.value = v.data_ptr<float>()[0];
   return pred;
 }
 
@@ -129,210 +146,131 @@ LossStats PolicyValueModel::train_batch(const std::vector<TrainingExample>& batc
                                         float lr,
                                         float weight_decay) {
   LossStats stats{};
-  if (batch.empty()) {
+  if (batch.empty() || !net_ || !optimizer_) {
     return stats;
   }
 
-  std::vector<float> g_wp(wp_.size(), 0.0f);
-  std::array<float, 4> g_bp{0.0f, 0.0f, 0.0f, 0.0f};
-  std::vector<float> g_wv(wv_.size(), 0.0f);
-  float g_bv = 0.0f;
+  std::lock_guard<std::mutex> lock(train_mu_);
+  net_->train();
+
+  auto& options = static_cast<torch::optim::AdamWOptions&>(optimizer_->param_groups()[0].options());
+  options.lr(lr);
+  options.weight_decay(weight_decay);
+
+  const int64_t bs = static_cast<int64_t>(batch.size());
+  std::vector<float> states;
+  std::vector<float> targets_p;
+  std::vector<float> targets_v;
+  states.reserve(static_cast<std::size_t>(bs * input_dim_));
+  targets_p.reserve(static_cast<std::size_t>(bs * 4));
+  targets_v.reserve(static_cast<std::size_t>(bs));
 
   for (const auto& ex : batch) {
     if (static_cast<int>(ex.state.size()) != input_dim_) {
       continue;
     }
-
-    auto lg = logits(ex.state);
-    auto p = softmax(lg);
-
-    float linear_v = bv_;
-    for (int i = 0; i < input_dim_; ++i) {
-      linear_v += wv_[static_cast<std::size_t>(i)] * ex.state[static_cast<std::size_t>(i)];
-    }
-    const float v = std::tanh(linear_v);
-
-    float p_loss = 0.0f;
+    states.insert(states.end(), ex.state.begin(), ex.state.end());
     for (int a = 0; a < 4; ++a) {
-      const float target = ex.policy[static_cast<std::size_t>(a)];
-      const float pa = std::max(p[static_cast<std::size_t>(a)], 1e-8f);
-      p_loss += -target * std::log(pa);
+      targets_p.push_back(ex.policy[static_cast<std::size_t>(a)]);
     }
-    const float v_loss = (v - ex.outcome) * (v - ex.outcome);
-
-    stats.policy += p_loss;
-    stats.value += v_loss;
-
-    std::array<float, 4> dlogits{0.0f, 0.0f, 0.0f, 0.0f};
-    for (int a = 0; a < 4; ++a) {
-      dlogits[static_cast<std::size_t>(a)] = p[static_cast<std::size_t>(a)] - ex.policy[static_cast<std::size_t>(a)];
-    }
-
-    for (int a = 0; a < 4; ++a) {
-      const std::size_t base = static_cast<std::size_t>(a * input_dim_);
-      const float dl = dlogits[static_cast<std::size_t>(a)];
-      g_bp[static_cast<std::size_t>(a)] += dl;
-      for (int i = 0; i < input_dim_; ++i) {
-        g_wp[base + static_cast<std::size_t>(i)] += dl * ex.state[static_cast<std::size_t>(i)];
-      }
-    }
-
-    const float dvalue = 2.0f * (v - ex.outcome) * (1.0f - v * v);
-    g_bv += dvalue;
-    for (int i = 0; i < input_dim_; ++i) {
-      g_wv[static_cast<std::size_t>(i)] += dvalue * ex.state[static_cast<std::size_t>(i)];
-    }
+    targets_v.push_back(ex.outcome);
   }
 
-  const float inv_n = 1.0f / static_cast<float>(batch.size());
+  if (states.empty()) {
+    return stats;
+  }
 
-  for (std::size_t i = 0; i < g_wp.size(); ++i) {
-    g_wp[i] = g_wp[i] * inv_n + weight_decay * wp_[i];
-  }
-  for (int a = 0; a < 4; ++a) {
-    g_bp[static_cast<std::size_t>(a)] *= inv_n;
-  }
-  for (std::size_t i = 0; i < g_wv.size(); ++i) {
-    g_wv[i] = g_wv[i] * inv_n + weight_decay * wv_[i];
-  }
-  g_bv *= inv_n;
+  const int64_t real_bs = static_cast<int64_t>(targets_v.size());
 
-  ++step_;
-  const float t = static_cast<float>(step_);
-  const float b1_corr = 1.0f - std::pow(kBeta1, t);
-  const float b2_corr = 1.0f - std::pow(kBeta2, t);
+  auto x = torch::from_blob(states.data(), {real_bs, 4, board_size_, board_size_}, torch::kFloat32)
+               .clone()
+               .to(device_);
+  auto y_p = torch::from_blob(targets_p.data(), {real_bs, 4}, torch::kFloat32).clone().to(device_);
+  auto y_v = torch::from_blob(targets_v.data(), {real_bs, 1}, torch::kFloat32).clone().to(device_);
 
-  auto adam_update = [&](float& w, float& m, float& v, float g) {
-    m = kBeta1 * m + (1.0f - kBeta1) * g;
-    v = kBeta2 * v + (1.0f - kBeta2) * g * g;
-    const float m_hat = m / b1_corr;
-    const float v_hat = v / b2_corr;
-    w -= lr * m_hat / (std::sqrt(v_hat) + kEps);
-  };
+  auto out = net_->forward(x);
+  auto pred_p = out.first;
+  auto pred_v = out.second;
 
-  for (std::size_t i = 0; i < wp_.size(); ++i) {
-    adam_update(wp_[i], m_wp_[i], v_wp_[i], g_wp[i]);
-  }
-  for (int a = 0; a < 4; ++a) {
-    adam_update(bp_[static_cast<std::size_t>(a)],
-                m_bp_[static_cast<std::size_t>(a)],
-                v_bp_[static_cast<std::size_t>(a)],
-                g_bp[static_cast<std::size_t>(a)]);
-  }
-  for (std::size_t i = 0; i < wv_.size(); ++i) {
-    adam_update(wv_[i], m_wv_[i], v_wv_[i], g_wv[i]);
-  }
-  adam_update(bv_, m_bv_, v_bv_, g_bv);
+  auto p_loss = -(y_p * (pred_p + 1e-8).log()).sum(1).mean();
+  auto v_loss = torch::mse_loss(pred_v, y_v);
+  auto total = p_loss + v_loss;
 
-  stats.policy *= inv_n;
-  stats.value *= inv_n;
-  stats.total = stats.policy + stats.value;
+  optimizer_->zero_grad();
+  total.backward();
+  optimizer_->step();
+
+  stats.total = total.item<float>();
+  stats.policy = p_loss.item<float>();
+  stats.value = v_loss.item<float>();
   return stats;
 }
 
 void PolicyValueModel::copy_from(const PolicyValueModel& other) {
-  board_size_ = other.board_size_;
-  input_dim_ = other.input_dim_;
-  step_ = other.step_;
+  if (!other.net_) {
+    return;
+  }
 
-  wp_ = other.wp_;
-  bp_ = other.bp_;
-  wv_ = other.wv_;
-  bv_ = other.bv_;
+  if (!net_ || board_size_ != other.board_size_ || channels_ != other.channels_ || blocks_ != other.blocks_) {
+    init(other.board_size_, other.channels_, other.blocks_, 42, 1e-3f, 1e-4f);
+  }
 
-  m_wp_ = other.m_wp_;
-  v_wp_ = other.v_wp_;
-  m_bp_ = other.m_bp_;
-  v_bp_ = other.v_bp_;
-  m_wv_ = other.m_wv_;
-  v_wv_ = other.v_wv_;
-  m_bv_ = other.m_bv_;
-  v_bv_ = other.v_bv_;
+  torch::NoGradGuard no_grad;
+
+  auto dst_params = net_->named_parameters(true /* recurse */);
+  auto src_params = other.net_->named_parameters(true);
+  for (const auto& item : src_params) {
+    auto* t = dst_params.find(item.key());
+    if (t != nullptr) {
+      t->copy_(item.value());
+    }
+  }
+
+  auto dst_buffers = net_->named_buffers(true);
+  auto src_buffers = other.net_->named_buffers(true);
+  for (const auto& item : src_buffers) {
+    auto* t = dst_buffers.find(item.key());
+    if (t != nullptr) {
+      t->copy_(item.value());
+    }
+  }
 }
 
 bool PolicyValueModel::save(const std::string& path, std::string& error) const {
-  std::ofstream out(path, std::ios::binary);
-  if (!out) {
-    error = "No se pudo abrir para escribir: " + path;
+  if (!net_) {
+    error = "Modelo no inicializado";
     return false;
   }
 
-  FileHeader h{};
-  h.magic = kMagic;
-  h.version = 1;
-  h.board_size = static_cast<uint32_t>(board_size_);
-  h.input_dim = static_cast<uint32_t>(input_dim_);
-  h.step = step_;
-
-  out.write(reinterpret_cast<const char*>(&h), sizeof(h));
-  write_vec(out, wp_);
-  out.write(reinterpret_cast<const char*>(bp_.data()), sizeof(float) * bp_.size());
-  write_vec(out, wv_);
-  out.write(reinterpret_cast<const char*>(&bv_), sizeof(bv_));
-
-  write_vec(out, m_wp_);
-  write_vec(out, v_wp_);
-  out.write(reinterpret_cast<const char*>(m_bp_.data()), sizeof(float) * m_bp_.size());
-  out.write(reinterpret_cast<const char*>(v_bp_.data()), sizeof(float) * v_bp_.size());
-  write_vec(out, m_wv_);
-  write_vec(out, v_wv_);
-  out.write(reinterpret_cast<const char*>(&m_bv_), sizeof(m_bv_));
-  out.write(reinterpret_cast<const char*>(&v_bv_), sizeof(v_bv_));
-
-  if (!out.good()) {
-    error = "Fallo al escribir modelo: " + path;
+  try {
+    std::error_code ec;
+    fs::create_directories(fs::path(path).parent_path(), ec);
+    torch::serialize::OutputArchive archive;
+    net_->save(archive);
+    archive.save_to(path);
+    return true;
+  } catch (const c10::Error& e) {
+    error = std::string("save archive fallo: ") + e.what();
     return false;
   }
-  return true;
 }
 
 bool PolicyValueModel::load(const std::string& path, std::string& error) {
-  std::ifstream in(path, std::ios::binary);
-  if (!in) {
-    error = "No se pudo abrir modelo: " + path;
+  if (!net_) {
+    error = "Modelo no inicializado";
     return false;
   }
 
-  FileHeader h{};
-  in.read(reinterpret_cast<char*>(&h), sizeof(h));
-  if (!in.good() || h.magic != kMagic) {
-    error = "Modelo invalido o magic incorrecto: " + path;
+  try {
+    torch::serialize::InputArchive archive;
+    archive.load_from(path);
+    net_->load(archive);
+    net_->to(device_);
+    return true;
+  } catch (const c10::Error& e) {
+    error = std::string("load archive fallo: ") + e.what();
     return false;
   }
-
-  board_size_ = static_cast<int>(h.board_size);
-  input_dim_ = static_cast<int>(h.input_dim);
-  step_ = h.step;
-
-  if (!read_vec(in, wp_)) {
-    error = "Error leyendo wp";
-    return false;
-  }
-  in.read(reinterpret_cast<char*>(bp_.data()), sizeof(float) * bp_.size());
-  if (!read_vec(in, wv_)) {
-    error = "Error leyendo wv";
-    return false;
-  }
-  in.read(reinterpret_cast<char*>(&bv_), sizeof(bv_));
-
-  if (!read_vec(in, m_wp_) || !read_vec(in, v_wp_)) {
-    error = "Error leyendo estados Adam wp";
-    return false;
-  }
-  in.read(reinterpret_cast<char*>(m_bp_.data()), sizeof(float) * m_bp_.size());
-  in.read(reinterpret_cast<char*>(v_bp_.data()), sizeof(float) * v_bp_.size());
-  if (!read_vec(in, m_wv_) || !read_vec(in, v_wv_)) {
-    error = "Error leyendo estados Adam wv";
-    return false;
-  }
-  in.read(reinterpret_cast<char*>(&m_bv_), sizeof(m_bv_));
-  in.read(reinterpret_cast<char*>(&v_bv_), sizeof(v_bv_));
-
-  if (!in.good()) {
-    error = "Error leyendo modelo completo: " + path;
-    return false;
-  }
-  return true;
 }
 
 }  // namespace alphasnake

@@ -11,15 +11,11 @@
 
 ## PROVISIONING_SCRIPT
 
-Pega esto en el campo `PROVISIONING_SCRIPT`:
+En Vast.ai, `PROVISIONING_SCRIPT` debe ser una URL raw (no script pegado).
+Usa exactamente este valor:
 
-```bash
-#!/usr/bin/env bash
-set -euo pipefail
-
-cd /workspace/arcade/games/snake/ai/cpp
-./scripts/provision_vast.sh
-./scripts/build.sh
+```text
+https://raw.githubusercontent.com/JuanTorresU/arcade/main/games/snake/ai/cpp/vast/provision_bootstrap.sh
 ```
 
 ## Inicio de entrenamiento en la instancia

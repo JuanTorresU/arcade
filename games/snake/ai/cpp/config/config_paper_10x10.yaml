@@ -8,6 +8,10 @@ env:
   board_size: 10
   max_steps: 1000
 
+model:
+  channels: 64
+  blocks: 6
+
 mcts:
   simulations: 400
   cpuct: 1.0

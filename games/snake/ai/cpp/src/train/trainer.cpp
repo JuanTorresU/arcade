@@ -65,8 +65,18 @@ std::string now_clock() {
 AlphaSnakeTrainer::AlphaSnakeTrainer(const TrainConfig& cfg)
     : cfg_(cfg),
       buffer_(cfg.buffer_size),
-      best_model_(cfg.board_size, static_cast<uint32_t>(cfg.seed)),
-      candidate_model_(cfg.board_size, static_cast<uint32_t>(cfg.seed + 1)) {}
+      best_model_(cfg.board_size,
+                  cfg.model_channels,
+                  cfg.model_blocks,
+                  static_cast<uint32_t>(cfg.seed),
+                  cfg.lr,
+                  cfg.weight_decay),
+      candidate_model_(cfg.board_size,
+                       cfg.model_channels,
+                       cfg.model_blocks,
+                       static_cast<uint32_t>(cfg.seed + 1),
+                       cfg.lr,
+                       cfg.weight_decay) {}
 
 bool AlphaSnakeTrainer::ensure_dirs(std::string& error) const {
   std::error_code ec;
@@ -202,6 +212,13 @@ std::vector<TrainingExample> AlphaSnakeTrainer::run_self_play(int iteration) {
 
   for (int w = 0; w < workers; ++w) {
     pool.emplace_back([&, w]() {
+      PolicyValueModel local_model(cfg_.board_size,
+                                   cfg_.model_channels,
+                                   cfg_.model_blocks,
+                                   static_cast<uint32_t>(cfg_.seed + 100 + w),
+                                   cfg_.lr,
+                                   cfg_.weight_decay);
+      local_model.copy_from(best_model_);
       while (true) {
         const int g = next_game.fetch_add(1);
         if (g >= cfg_.games_per_iter) {
@@ -209,7 +226,7 @@ std::vector<TrainingExample> AlphaSnakeTrainer::run_self_play(int iteration) {
         }
         const uint32_t seed = static_cast<uint32_t>(
             cfg_.seed + iteration * 100000 + w * 1000 + g);
-        auto ex = play_single_game(best_model_, seed, true);
+        auto ex = play_single_game(local_model, seed, true);
 
         total_positions.fetch_add(static_cast<long long>(ex.size()));
         {

@@ -22,7 +22,7 @@ int main(int argc, char** argv) {
 
   const std::string ckpt = cli_get(args, "--checkpoint", cfg.save_dir + "/best_model.bin");
   const std::string out = cli_get(args, "--out", cfg.save_dir + "/alphasnake.onnx");
-  const std::string py_fallback = cli_get(args, "--python-fallback", "scripts/export_linear_to_onnx.py");
+  const std::string py_fallback = cli_get(args, "--python-fallback", "scripts/export_resnet_to_onnx.py");
   const bool allow_fallback = cli_get(args, "--allow-fallback", "1") != "0";
 
   std::cout << "Export ONNX (C++ path)\n";
@@ -44,7 +44,9 @@ int main(int argc, char** argv) {
 
   std::string cmd = "python3 \"" + py_fallback + "\" --checkpoint \"" + ckpt +
                     "\" --out \"" + out + "\" --board-size " +
-                    std::to_string(cfg.board_size);
+                    std::to_string(cfg.board_size) + " --channels " +
+                    std::to_string(cfg.model_channels) + " --blocks " +
+                    std::to_string(cfg.model_blocks);
 
   std::cout << "[INFO] Ejecutando fallback: " << cmd << "\n";
   const int rc = std::system(cmd.c_str());

@@ -12,5 +12,5 @@ OUT="${OUT:-/workspace/alphasnake_paper_10x10/alphasnake.onnx}"
   --config "$CONFIG" \
   --checkpoint "$CKPT" \
   --out "$OUT" \
-  --python-fallback "$ROOT_DIR/scripts/export_linear_to_onnx.py" \
+  --python-fallback "$ROOT_DIR/scripts/export_resnet_to_onnx.py" \
   --allow-fallback 1

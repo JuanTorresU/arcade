@@ -23,7 +23,7 @@ Entrenamiento de AlphaSnake por CLI C++ para correr en instancias Vast.ai.
 - `scripts/run_eval.sh`
 - `scripts/run_export.sh`
 - `scripts/scp_onnx_from_vast.sh`
-- `scripts/export_linear_to_onnx.py`
+- `scripts/export_resnet_to_onnx.py`
 - `vast/template.md`
 
 ## Compilar
@@ -89,11 +89,14 @@ Valida:
 
 ## Nota técnica
 
-Este baseline C++ ya implementa:
+Este trainer C++ ahora implementa:
 
 - Entorno paper-faithful (10x10, sparse rewards, no reverse).
 - MCTS con PUCT + Dirichlet + food stochasticity.
 - Loop self-play -> train -> eval -> champion -> checkpoint.
+- Red Policy/Value tipo paper con LibTorch C++:
+  - stem `Conv(64,3)+BN+ReLU`
+  - `6` bloques residuales
+  - policy head y value head separados.
 
-La red implementada en este bootstrap es lineal policy/value para mantener el pipeline 100% C++ operativo.
-Si quieres estricta arquitectura ResNet (stem + 6 residuales + heads) en C++/CUDA, se monta sobre el mismo pipeline reemplazando `src/model/policy_value_model.*`.
+Requisito: compilar en entorno con PyTorch/libtorch disponible (ej. `vastai/pytorch_*`).

@@ -8,6 +8,8 @@ namespace alphasnake {
 struct TrainConfig {
   int board_size = 10;
   int max_steps = 1000;
+  int model_channels = 64;
+  int model_blocks = 6;
   int num_simulations = 400;
   float c_puct = 1.0f;
   float dirichlet_alpha = 0.03f;

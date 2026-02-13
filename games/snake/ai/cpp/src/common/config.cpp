@@ -109,6 +109,10 @@ bool load_config_file(const std::string& path, TrainConfig& cfg, std::string& er
       if (!set_int(cfg.board_size)) return false;
     } else if (full == "env.max_steps" || full == "max_steps") {
       if (!set_int(cfg.max_steps)) return false;
+    } else if (full == "model.channels" || full == "model_channels") {
+      if (!set_int(cfg.model_channels)) return false;
+    } else if (full == "model.blocks" || full == "model_blocks") {
+      if (!set_int(cfg.model_blocks)) return false;
     } else if (full == "mcts.simulations" || full == "num_simulations") {
       if (!set_int(cfg.num_simulations)) return false;
     } else if (full == "mcts.cpuct" || full == "c_puct") {

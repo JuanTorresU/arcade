@@ -6,6 +6,12 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 option(ALPHASNAKE_BUILD_TESTS "Build test binaries" ON)
+option(ALPHASNAKE_USE_TORCH "Build with LibTorch backend (ResNet-6)" ON)
+
+if(ALPHASNAKE_USE_TORCH)
+  find_package(Torch REQUIRED)
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${TORCH_CXX_FLAGS}")
+endif()
 
 add_library(alphasnake_core
   src/common/config.cpp
@@ -16,6 +22,10 @@ add_library(alphasnake_core
 )
 
 target_include_directories(alphasnake_core PUBLIC src)
+if(ALPHASNAKE_USE_TORCH)
+  target_link_libraries(alphasnake_core PUBLIC ${TORCH_LIBRARIES})
+  target_compile_definitions(alphasnake_core PUBLIC ALPHASNAKE_USE_TORCH=1)
+endif()
 
 target_compile_options(alphasnake_core PRIVATE
   $<$<CXX_COMPILER_ID:GNU,Clang>:-O3 -Wall -Wextra -Wpedantic>

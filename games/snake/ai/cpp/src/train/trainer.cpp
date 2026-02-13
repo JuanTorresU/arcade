@@ -433,7 +433,7 @@ std::vector<TrainingExample> AlphaSnakeTrainer::run_self_play(int iteration) {
               << " | positions=" << total_positions.load()
               << " | batches=" << st.batches
               << " | avg_batch=" << std::fixed << std::setprecision(1) << avg_states
-              << std::defaultfloat;
+              << std::defaultfloat << std::setprecision(6);
     if (avg_states > 0.0 && avg_states < static_cast<double>(cfg_.inference_batch_size) * 0.25) {
       std::cout << " [WARN: batch bajo, GPU ociosa]";
     }

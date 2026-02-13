@@ -312,7 +312,14 @@ std::vector<TrainingExample> AlphaSnakeTrainer::play_single_game(PredictFn predi
     }
   }
 
-  const float z = env.is_win() ? 1.0f : -1.0f;
+  // Valor normalizado: longitud de serpiente mapeada a [-1, +1].
+  // Ganar (llenar el tablero) = +1.0, morir con longitud mínima ≈ -0.94.
+  // Esto da señal al value head en vez de -1 constante.
+  const float max_cells = static_cast<float>(cfg_.board_size * cfg_.board_size);
+  const float z = env.is_win()
+      ? 1.0f
+      : (2.0f * static_cast<float>(env.snake_length()) / max_cells - 1.0f);
+
   std::vector<TrainingExample> examples;
   examples.reserve(states.size());
   for (std::size_t i = 0; i < states.size(); ++i) {
@@ -394,6 +401,9 @@ std::vector<TrainingExample> AlphaSnakeTrainer::run_self_play(int iteration) {
 
 LossStats AlphaSnakeTrainer::train_candidate(std::mt19937& rng) {
   candidate_model_.copy_from(best_model_);
+  // Reiniciar optimizador para que momentum/varianza de Adam no queden
+  // desalineados con los pesos recién copiados.
+  candidate_model_.reset_optimizer(cfg_.lr, cfg_.weight_decay);
 
   if (buffer_.size() < static_cast<std::size_t>(cfg_.batch_size)) {
     return LossStats{};
@@ -500,18 +510,24 @@ bool AlphaSnakeTrainer::run(bool resume, std::string& error) {
     std::cout << "  [Train] loss=" << losses.total << " (p=" << losses.policy
               << ", v=" << losses.value << ")\n";
 
+    // Evaluar ambos modelos con los MISMOS seeds para comparación justa.
+    EvalMetrics eval_best = evaluate_model(best_model_, cfg_.eval_games, iter);
     EvalMetrics eval_new = evaluate_model(candidate_model_, cfg_.eval_games, iter);
-    std::cout << "  [Eval] win_rate=" << eval_new.win_rate
+    std::cout << "  [Eval best]      win=" << eval_best.win_rate
+              << " avg_len=" << eval_best.avg_length << "\n";
+    std::cout << "  [Eval candidate] win=" << eval_new.win_rate
               << " avg_len=" << eval_new.avg_length << "\n";
 
-    const bool accept = eval_new.win_rate >= cfg_.accept_threshold &&
-                        eval_new.win_rate >= best_win_rate_;
+    // Aceptar si el candidato logra mejor longitud promedio en los mismos juegos.
+    const bool accept = eval_new.avg_length >= eval_best.avg_length;
     if (accept) {
       best_model_.copy_from(candidate_model_);
       best_win_rate_ = eval_new.win_rate;
-      std::cout << "  [Champion] actualizado (threshold=" << cfg_.accept_threshold << ")\n";
+      std::cout << "  [Champion] actualizado (avg_len " << eval_best.avg_length
+                << " -> " << eval_new.avg_length << ")\n";
     } else {
-      std::cout << "  [Champion] se mantiene\n";
+      std::cout << "  [Champion] se mantiene (best=" << eval_best.avg_length
+                << " > candidate=" << eval_new.avg_length << ")\n";
     }
 
     if (!save_checkpoint(iter, error)) {

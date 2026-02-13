@@ -284,6 +284,15 @@ void PolicyValueModel::copy_from(const PolicyValueModel& other) {
   }
 }
 
+void PolicyValueModel::reset_optimizer(float lr, float weight_decay) {
+  if (!net_) {
+    return;
+  }
+  optimizer_ = std::make_unique<torch::optim::AdamW>(
+      net_->parameters(),
+      torch::optim::AdamWOptions(lr).weight_decay(weight_decay));
+}
+
 bool PolicyValueModel::save(const std::string& path, std::string& error) const {
   if (!net_) {
     error = "Modelo no inicializado";

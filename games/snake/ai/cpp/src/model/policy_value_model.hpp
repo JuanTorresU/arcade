@@ -80,6 +80,7 @@ class PolicyValueModel {
   LossStats train_batch(const std::vector<TrainingExample>& batch, float lr, float weight_decay);
 
   void copy_from(const PolicyValueModel& other);
+  void reset_optimizer(float lr, float weight_decay);
 
   bool save(const std::string& path, std::string& error) const;
   bool load(const std::string& path, std::string& error);

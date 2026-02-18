@@ -49,7 +49,8 @@ int main(int argc, char** argv) {
 
   const std::string ckpt = cli_get(args, "--checkpoint", cfg.save_dir + "/best_model.bin");
 
-  PolicyValueModel model;
+  PolicyValueModel model(cfg.board_size, cfg.model_channels, cfg.model_blocks,
+                         static_cast<uint32_t>(cfg.seed), cfg.lr, cfg.weight_decay);
   if (!model.load(ckpt, err)) {
     std::cerr << "[ERROR] " << err << "\n";
     return 1;

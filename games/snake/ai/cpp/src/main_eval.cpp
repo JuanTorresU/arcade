@@ -61,6 +61,7 @@ int main(int argc, char** argv) {
 
   std::cout << "Evaluando checkpoint: " << ckpt << "\n";
   std::cout << "Juegos: " << cfg.eval_games << " | Simulaciones MCTS: " << cfg.num_simulations << "\n";
+  std::cout << std::flush;
 
   for (int g = 0; g < cfg.eval_games; ++g) {
     const uint32_t seed = static_cast<uint32_t>(cfg.seed + g * 97);
@@ -83,10 +84,12 @@ int main(int argc, char** argv) {
     }
     len_sum += static_cast<long long>(env.snake_length());
 
+    std::cout << "  Progreso: " << (g + 1) << "/" << cfg.eval_games << "\r" << std::flush;
     if ((g + 1) % std::max(1, cfg.eval_games / 10) == 0) {
       std::cout << "  Progreso: " << (g + 1) << "/" << cfg.eval_games << "\n";
     }
   }
+  std::cout << "\n";
 
   const float win_rate = static_cast<float>(wins) / static_cast<float>(cfg.eval_games);
   const float avg_len = static_cast<float>(len_sum) / static_cast<float>(cfg.eval_games);

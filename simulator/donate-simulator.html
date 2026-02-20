@@ -59,6 +59,13 @@
     .gifts button.gift-destroy:hover { background: rgba(255, 45, 146, 0.15); }
     .gifts button.gift-help { border-color: rgba(0, 255, 180, 0.5); color: #00ffb4; }
     .gifts button.gift-help:hover { background: rgba(0, 255, 180, 0.15); }
+    .turbo-controls { display: flex; gap: 8px; margin-top: 2px; }
+    .turbo-btn { min-width: 110px; margin: 0; }
+    .turbo-btn.active {
+      background: rgba(0, 255, 180, 0.25);
+      border-color: rgba(0, 255, 180, 0.7);
+      box-shadow: 0 0 0 1px rgba(0, 255, 180, 0.35) inset;
+    }
     .log {
       margin-top: 24px;
       font-size: 11px;
@@ -118,6 +125,14 @@
         <div id="cfg-music-vol-val" style="font-size:11px; opacity:0.8; margin-top:4px;">0.25</div>
       </div>
       <div>
+        <label style="margin-top:0;">Velocidad simulacion bot</label>
+        <div class="turbo-controls">
+          <button type="button" id="btn-speed-1x" class="turbo-btn">Normal x1</button>
+          <button type="button" id="btn-speed-10x" class="turbo-btn">Turbo x10</button>
+        </div>
+        <div id="cfg-speed-val" style="font-size:11px; opacity:0.8; margin-top:4px;">x1</div>
+      </div>
+      <div>
         <button type="button" id="btn-start-music">Reintentar iniciar música</button>
       </div>
     </div>
@@ -147,9 +162,13 @@
       var sfxVolVal = document.getElementById('cfg-sfx-vol-val');
       var musicVol = document.getElementById('cfg-music-vol');
       var musicVolVal = document.getElementById('cfg-music-vol-val');
+      var btnSpeed1x = document.getElementById('btn-speed-1x');
+      var btnSpeed10x = document.getElementById('btn-speed-10x');
+      var speedVal = document.getElementById('cfg-speed-val');
       var btnStartMusic = document.getElementById('btn-start-music');
 
       var giftList = [];
+      var speedMultiplier = 1;
 
       function applyGiftsConfig(gifts) {
         if (!gifts || !gifts.length) return;
@@ -222,6 +241,15 @@
         ws.send(JSON.stringify({ type: 'config', config: config }));
       }
 
+      function setSpeedMultiplier(mult, skipApply) {
+        var n = Number(mult);
+        speedMultiplier = (isFinite(n) && n >= 1) ? Math.min(20, Math.round(n)) : 1;
+        speedVal.textContent = 'x' + speedMultiplier;
+        btnSpeed1x.classList.toggle('active', speedMultiplier === 1);
+        btnSpeed10x.classList.toggle('active', speedMultiplier === 10);
+        if (!skipApply) applyConfigFromUI();
+      }
+
       function applyConfigFromUI() {
         var preset = (sfxPresetSel.value || 'clean');
         var sfxV = parseFloat(sfxVol.value);
@@ -229,10 +257,23 @@
         sfxVolVal.textContent = isFinite(sfxV) ? sfxV.toFixed(1) : '—';
         musicVolVal.textContent = isFinite(musV) ? musV.toFixed(2) : '—';
         try {
-          localStorage.setItem('arcade_sim_cfg', JSON.stringify({ preset: preset, sfxV: sfxV, musV: musV }));
+          localStorage.setItem('arcade_sim_cfg', JSON.stringify({
+            preset: preset,
+            sfxV: sfxV,
+            musV: musV,
+            speedMultiplier: speedMultiplier
+          }));
         } catch (e) {}
-        sendConfig({ sfxPreset: preset, sfxVolume: sfxV, bgMusicVolume: musV });
-        log('Config aplicada: preset=' + preset + ' | sfx=' + sfxV.toFixed(1) + ' | music=' + musV.toFixed(2));
+        sendConfig({
+          sfxPreset: preset,
+          sfxVolume: sfxV,
+          bgMusicVolume: musV,
+          speedMultiplier: speedMultiplier
+        });
+        log('Config aplicada: preset=' + preset +
+            ' | sfx=' + sfxV.toFixed(1) +
+            ' | music=' + musV.toFixed(2) +
+            ' | speed=x' + speedMultiplier);
       }
 
       function connect() {
@@ -278,14 +319,19 @@
           if (cfg.preset) sfxPresetSel.value = cfg.preset;
           if (typeof cfg.sfxV === 'number') sfxVol.value = String(cfg.sfxV);
           if (typeof cfg.musV === 'number') musicVol.value = String(cfg.musV);
+          if (typeof cfg.speedMultiplier === 'number') setSpeedMultiplier(cfg.speedMultiplier, true);
           sfxVolVal.textContent = parseFloat(sfxVol.value).toFixed(1);
           musicVolVal.textContent = parseFloat(musicVol.value).toFixed(2);
         } catch (e) {}
       })();
 
+      setSpeedMultiplier(speedMultiplier, true);
+
       sfxPresetSel.addEventListener('change', applyConfigFromUI);
       sfxVol.addEventListener('input', applyConfigFromUI);
       musicVol.addEventListener('input', applyConfigFromUI);
+      btnSpeed1x.addEventListener('click', function () { setSpeedMultiplier(1); });
+      btnSpeed10x.addEventListener('click', function () { setSpeedMultiplier(10); });
       btnStartMusic.addEventListener('click', function () {
         sendConfig({ startBgMusic: true });
         log('Reintentando iniciar música…');

@@ -30,6 +30,11 @@ const server = http.createServer((req, res) => {
   // Si la ruta apunta a un directorio, servir su index.html
   try {
     if (fs.statSync(filePath).isDirectory()) {
+      if (!req.url.endsWith('/')) {
+        res.writeHead(301, { 'Location': req.url + '/' });
+        res.end();
+        return;
+      }
       filePath = path.join(filePath, 'index.html');
     }
   } catch (e) { /* no existe, se resuelve abajo */ }

@@ -13,7 +13,8 @@
   let CELL = 20;
   let COLS = 20;
   let ROWS = 20;
-  let TICK_BASE = 120;
+  const NORMAL_TICK_BASE = 110;
+  let TICK_BASE = NORMAL_TICK_BASE;
   let TICK_MIN = 85;
   const TRAIL_LENGTH = 14;
   let GOLDEN_CHANCE = 0.08;
@@ -37,13 +38,16 @@
   let hue = 165;
   let metrics = { deaths: 0, timeAlive: 0, startTime: 0, gifts: 0, users: new Set() };
   let effectListeners = [];
+  let beforeTickListeners = [];
   let trail = [];
   let particles = [];
   let floatingNumbers = [];
   let justBrokeRecord = false;
   let tickMsScale = 0;
+  let speedMultiplier = 1;
   let blinkTimer = 0;
   let tongueTimer = 0;
+  let initialFoodsRemaining = 0;
 
   const DIRECTIONS = {
     up: { x: 0, y: -1 },
@@ -89,9 +93,10 @@
     blinkTimer = 0;
     tongueTimer = 0;
     justBrokeRecord = false;
-    spawnFood();
+    initialFoodsRemaining = spawnManyFruits(200);
     metrics.startTime = Date.now();
     metrics.timeAlive = 0;
+    lastTick = performance.now();
   }
 
   function getFreeCells() {
@@ -129,6 +134,7 @@
       free.splice(idx, 1);
     }
     notifyEffect('spawnFruits', n);
+    return n;
   }
 
   function spawnEatParticles(cx, cy, hueF) {
@@ -165,6 +171,10 @@
 
   function tick() {
     if (gameOver) return;
+    // Permite que el bot decida justo antes de avanzar un tick.
+    for (let i = 0; i < beforeTickListeners.length; i++) {
+      try { beforeTickListeners[i](); } catch (e) { console.warn(e); }
+    }
     dir = { ...nextDir };
     const head = { x: snake[0].x + dir.x, y: snake[0].y + dir.y };
     const eatenIdx = foods.findIndex(f => f.x === head.x && f.y === head.y);
@@ -175,7 +185,7 @@
       die();
       return;
     }
-    const checkLen = (ENGINE_MODE === 'ai' && !ateFood) ? snake.length - 1 : snake.length;
+    const checkLen = (!ateFood) ? snake.length - 1 : snake.length;
     let hitBody = false;
     for (let i = 0; i < checkLen; i++) {
       if (snake[i].x === head.x && snake[i].y === head.y) {
@@ -227,7 +237,12 @@
         notifyEffect('win', { score, timeAlive: metrics.timeAlive });
         return;
       }
-      spawnFood();
+      if (initialFoodsRemaining > 0) {
+        initialFoodsRemaining = Math.max(0, initialFoodsRemaining - 1);
+      }
+      if (initialFoodsRemaining <= 0) {
+        spawnFood();
+      }
       // Velocidad por score: cada 50 pts un poco más rápido
       if (EFFECTS_ENABLED) {
         const newScale = Math.floor(score / 50) * 3;
@@ -686,9 +701,17 @@
   function gameLoop(now) {
     requestAnimationFrame(gameLoop);
     if (!canvas || !ctx) return;
-    if (!gameOver && now - lastTick >= tickMs) {
-      lastTick = now;
-      tick();
+    if (!gameOver) {
+      const effectiveTickMs = Math.max(4, tickMs / speedMultiplier);
+      let steps = Math.floor((now - lastTick) / effectiveTickMs);
+      if (steps > 0) {
+        // Evita espirales de CPU si la pestaña estuvo congelada.
+        steps = Math.min(steps, 24);
+        for (let i = 0; i < steps && !gameOver; i++) tick();
+        lastTick += steps * effectiveTickMs;
+        // Si hay mucho drift, resincroniza al frame actual.
+        if (now - lastTick > effectiveTickMs * 2) lastTick = now;
+      }
     }
     draw();
   }
@@ -706,7 +729,7 @@
    */
   function applyEffect(type, value) {
     // En modo AI, los efectos TikTok estan desactivados; speed/slow siempre permitidos (teclas +/-)
-    if (!EFFECTS_ENABLED && type !== 'reset' && type !== 'speed' && type !== 'slow') return;
+    if (!EFFECTS_ENABLED && type !== 'reset' && type !== 'speed' && type !== 'slow' && type !== 'speedMultiplier') return;
     const v = value != null ? value : 1;
     switch (type) {
       case 'speed':
@@ -717,6 +740,12 @@
         tickMs = Math.max(TICK_MIN, Math.min(200, tickMs + (Number(v) || 0) * 20));
         notifyEffect('slow', tickMs);
         break;
+      case 'speedMultiplier': {
+        const n = Number(v);
+        speedMultiplier = Math.max(1, Math.min(20, isFinite(n) ? n : 1));
+        notifyEffect('speedMultiplier', speedMultiplier);
+        break;
+      }
       case 'kill':
         if (shieldUntil <= Date.now()) die();
         break;
@@ -769,6 +798,12 @@
     return () => { effectListeners = effectListeners.filter(f => f !== fn); };
   }
 
+  function onBeforeTick(fn) {
+    if (typeof fn !== 'function') return () => {};
+    beforeTickListeners.push(fn);
+    return () => { beforeTickListeners = beforeTickListeners.filter(f => f !== fn); };
+  }
+
   function getState() {
     const broke = justBrokeRecord;
     if (justBrokeRecord) justBrokeRecord = false;
@@ -782,6 +817,7 @@
       won,
       maxFoods: COLS * ROWS - 3,
       tickMs,
+      speedMultiplier,
       invertControls,
       shieldActive: shieldUntil > Date.now(),
       doubleScoreActive: doubleScoreUntil > Date.now(),
@@ -814,7 +850,7 @@
       EFFECTS_ENABLED = false;
     } else {
       COLS = 20; ROWS = 20; CELL = 20;
-      TICK_BASE = 120; TICK_MIN = 85;
+      TICK_BASE = NORMAL_TICK_BASE; TICK_MIN = 85;
       GOLDEN_CHANCE = 0.08;
       EFFECTS_ENABLED = true;
     }
@@ -874,6 +910,7 @@
       getAIState,
       setMode,
       onEffect,
+      onBeforeTick,
       resetGame: () => applyEffect('reset'),
       isGameOver: () => gameOver,
       getConfig: () => ({ mode: ENGINE_MODE, cols: COLS, rows: ROWS, cell: CELL })

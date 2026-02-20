@@ -663,11 +663,26 @@
   function applyConfig(cfg) {
     try {
       if (!cfg || typeof cfg !== 'object') return;
-      if (typeof global.ArcadeAudio === 'undefined') return;
-      if (cfg.sfxPreset) global.ArcadeAudio.setSfxPreset(cfg.sfxPreset);
-      if (typeof cfg.sfxVolume === 'number') global.ArcadeAudio.setSfxVolume(cfg.sfxVolume);
-      if (typeof cfg.bgMusicVolume === 'number') global.ArcadeAudio.setBgMusicVolume(cfg.bgMusicVolume);
-      if (cfg.startBgMusic) global.ArcadeAudio.startBgMusic();
+      const engine = getEngine();
+      const bot = getBot();
+
+      if (typeof cfg.speedMultiplier === 'number') {
+        const mult = Math.max(1, Math.min(20, cfg.speedMultiplier));
+        if (engine && typeof engine.applyEffect === 'function') {
+          engine.applyEffect('speedMultiplier', mult);
+        }
+        if (bot && typeof bot.setReactionMultiplier === 'function') {
+          bot.setReactionMultiplier(mult);
+        }
+      }
+
+      if (typeof global.ArcadeAudio !== 'undefined') {
+        if (cfg.sfxPreset) global.ArcadeAudio.setSfxPreset(cfg.sfxPreset);
+        if (typeof cfg.sfxVolume === 'number') global.ArcadeAudio.setSfxVolume(cfg.sfxVolume);
+        if (typeof cfg.bgMusicVolume === 'number') global.ArcadeAudio.setBgMusicVolume(cfg.bgMusicVolume);
+        if (cfg.startBgMusic) global.ArcadeAudio.startBgMusic();
+      }
+
       console.log('[Arcade] Config aplicada:', cfg);
     } catch (e) {}
   }
